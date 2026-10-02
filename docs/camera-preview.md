@@ -1,5 +1,7 @@
 # Windowsでのカメラ取得・人数検知（DB保存なし）
 
+このページはプレビュー・画像比較の手順です。後から追加した、明示的に有効化するDB保存の手順と223教室の接続検証結果は [camera-recording.md](camera-recording.md) を参照してください。
+
 Raspberry Piのmjpg-streamerのMJPEG配信をOpenCVで読み、YOLO11nの`person`（class 0）だけを数えます。
 マスキング範囲は未確定のため、この段階ではマスキングしません。
 このスクリプトはDjango・モデル・.envを読み込まず、DB保存と動画の保存を行いません。

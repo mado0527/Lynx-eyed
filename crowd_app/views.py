@@ -50,6 +50,7 @@ def home(request):
         'latest': latest, 'occupancy': occupancy,
         'invalid_location': invalid_location,
         'history': history, 'chart_points': points, 'chart_ticks': ticks,
+        'refresh_seconds': 2 if request.GET.get('realtime') == '1' else None,
     })
 
 

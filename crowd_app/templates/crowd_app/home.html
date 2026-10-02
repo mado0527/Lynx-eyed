@@ -4,6 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% if refresh_seconds %}<meta http-equiv="refresh" content="{{ refresh_seconds }}">{% endif %}
   <title>Lynx-eyed | 現在の混雑状況</title>
   <link rel="stylesheet" href="{% static 'crowd_app/home.css' %}">
 </head>
@@ -11,12 +12,13 @@
   <main class="container">
     <header class="header">
       <div><h1>ラウンジモニター</h1><p class="muted">混雑状況確認システム</p></div>
-      <div class="header-refresh"><div class="last-measured">最終計測日時<br>{% if latest %}{% timezone "Asia/Tokyo" %}<time datetime="{{ latest.recorded_at|date:'c' }}">{{ latest.recorded_at|date:'Y/m/d H:i:s' }}</time>（日本時間）{% endtimezone %}{% else %}未計測{% endif %}</div><button type="submit" form="location-form" class="icon-button" aria-label="更新" title="最新記録に更新"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg></button><span class="unimplemented-badge">自動検知：未実装</span></div>
+      <div class="header-refresh"><div class="last-measured">最終計測日時<br>{% if latest %}{% timezone "Asia/Tokyo" %}<time datetime="{{ latest.recorded_at|date:'c' }}">{{ latest.recorded_at|date:'Y/m/d H:i:s' }}</time>（日本時間）{% endtimezone %}{% else %}未計測{% endif %}</div><button type="submit" form="location-form" class="icon-button" aria-label="更新" title="最新記録に更新"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg></button><span class="unimplemented-badge">自動検知：検証中</span></div>
     </header>
     {% if invalid_location %}<p class="notice" role="status">指定された場所が見つかりません。登録済みの場所を表示しています。</p>{% endif %}
     <section class="location-card" aria-label="場所の選択と更新">
       {% if not selected_location %}<div><h2>場所が未登録です</h2></div>{% endif %}
       <form id="location-form" action="{% url 'home' %}" method="get" class="controls">
+        {% if refresh_seconds %}<input type="hidden" name="realtime" value="1">{% endif %}
         {% if locations|length > 1 %}
         <div class="select-field"><label for="location">表示する場所</label><select id="location" name="location">{% for location in locations %}<option value="{{ location.pk }}"{% if location.pk == selected_location.pk %} selected{% endif %}>{{ location.name }}</option>{% endfor %}</select></div>
         {% elif selected_location %}<input type="hidden" name="location" value="{{ selected_location.pk }}">{% endif %}

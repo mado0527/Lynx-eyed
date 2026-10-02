@@ -14,7 +14,8 @@ class CameraPreviewTests(unittest.TestCase):
         values = dict(source='test-input', timeout=1, capture_only=True,
                       headless=True, max_frames=1, model=Path(__file__),
                       conf=0.25, iou=0.7, imgsz=640, device='cpu', save_changes=False,
-                      max_images=2, output_dir=Path('.camera-runtime/test'))
+                      max_images=2, output_dir=Path('.camera-runtime/test'),
+                      save_db=False, location_id=None, interval=300, max_records=0)
         return argparse.Namespace(**(values | changes))
 
     @patch('cv2.VideoCapture')
@@ -73,6 +74,50 @@ class CameraPreviewTests(unittest.TestCase):
             self.assertEqual(len(list(saver.directory.glob('*.jpg'))), 2)
             self.assertEqual(len(list(saver.directory.glob('*.npz'))), 2)
             self.assertTrue((saver.directory / '002_6-to-7.jpg').exists())
+
+    @patch('cv2.VideoCapture')
+    def test_successful_zero_is_saved_when_explicitly_enabled(self, factory):
+        frame = np.zeros((100, 160, 3), dtype=np.uint8)
+        factory.return_value.isOpened.return_value = True
+        factory.return_value.read.return_value = (True, frame)
+        model = MagicMock()
+        model.names = {0: 'person'}
+        result = MagicMock()
+        result.boxes = []
+        result.plot.return_value = frame.copy()
+        model.predict.return_value = [result]
+        with patch('ultralytics.YOLO', return_value=model), patch('tools.db_recording.CrowdRecorder') as writer:
+            self.assertEqual(run(self.args(capture_only=False, save_db=True, location_id=1)), 0)
+            self.assertEqual(writer.return_value.save.call_args.args[0], 0)
+
+    @patch('cv2.VideoCapture')
+    def test_inference_failure_does_not_save(self, factory):
+        frame = np.zeros((100, 160, 3), dtype=np.uint8)
+        factory.return_value.isOpened.return_value = True
+        factory.return_value.read.return_value = (True, frame)
+        model = MagicMock()
+        model.names = {0: 'person'}
+        model.predict.side_effect = RuntimeError('Inference failure')
+        with patch('ultralytics.YOLO', return_value=model), patch('tools.db_recording.CrowdRecorder') as writer:
+            with self.assertRaises(RuntimeError):
+                run(self.args(capture_only=False, save_db=True, location_id=1))
+            writer.return_value.save.assert_not_called()
+
+    @patch('cv2.VideoCapture')
+    def test_interval_does_not_save_every_frame(self, factory):
+        frame = np.zeros((100, 160, 3), dtype=np.uint8)
+        factory.return_value.isOpened.return_value = True
+        factory.return_value.read.return_value = (True, frame)
+        model = MagicMock()
+        model.names = {0: 'person'}
+        result = MagicMock()
+        result.boxes = [object()]
+        result.plot.return_value = frame.copy()
+        model.predict.return_value = [result]
+        with patch('ultralytics.YOLO', return_value=model), patch('tools.db_recording.CrowdRecorder') as writer, patch('tools.camera_preview.time.monotonic', return_value=100):
+            self.assertEqual(run(self.args(capture_only=False, save_db=True, location_id=1, max_frames=3)), 0)
+            writer.return_value.save.assert_called_once()
+            model.predict.assert_called_once()
 
 
 if __name__ == '__main__':

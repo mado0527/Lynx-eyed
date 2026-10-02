@@ -268,3 +268,21 @@ class MockupScreenTests(TestCase):
         user = get_user_model().objects.create_user(username='limited_staff', is_staff=True)
         self.client.force_login(user)
         self.assertEqual(self.client.get(reverse('devices')).status_code, 403)
+
+
+class CameraRecordingIntegrationTests(TestCase):
+    def test_recorder_uses_existing_rate_calculation_and_top_page(self):
+        from tools.db_recording import CrowdRecorder
+        location = LocationMaster.objects.create(name='223検証', capacity=25)
+        recorder = CrowdRecorder(location.pk)
+        measured_at = timezone.now()
+        record = recorder.save(10, measured_at)
+        record.refresh_from_db()
+        self.assertEqual(record.crowd_rate, 40)
+        self.assertEqual(record.recorded_at, measured_at)
+        response = self.client.get('/', {'location': location.pk})
+        self.assertEqual(response.context['latest'], record)
+        self.assertEqual(response.context['occupancy'], Decimal('40.0'))
+        zero = recorder.save(0, timezone.now())
+        self.assertEqual(zero.crowd_rate, 0)
+        self.assertEqual(self.client.get('/', {'location': location.pk}).context['latest'], zero)
