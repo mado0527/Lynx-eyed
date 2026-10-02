@@ -1,0 +1,63 @@
+{% load static tz l10n %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lynx-eyed | 現在の混雑状況</title>
+  <link rel="stylesheet" href="{% static 'crowd_app/home.css' %}">
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <div><h1>ラウンジモニター</h1><p class="muted">混雑状況確認システム</p></div>
+      <div class="header-refresh"><div class="last-measured">最終計測日時<br>{% if latest %}{% timezone "Asia/Tokyo" %}<time datetime="{{ latest.recorded_at|date:'c' }}">{{ latest.recorded_at|date:'Y/m/d H:i:s' }}</time>（日本時間）{% endtimezone %}{% else %}未計測{% endif %}</div></div>
+    </header>
+    {% if invalid_location %}<p class="notice" role="status">指定された場所が見つかりません。登録済みの場所を表示しています。</p>{% endif %}
+    <section class="location-card" aria-label="場所の選択と更新">
+      {% if not selected_location %}<div><h2>場所が未登録です</h2></div>{% endif %}
+      <form action="{% url 'home' %}" method="get" class="controls">
+        {% if locations|length > 1 %}
+        <div class="select-field"><label for="location">表示する場所</label><select id="location" name="location">{% for location in locations %}<option value="{{ location.pk }}"{% if location.pk == selected_location.pk %} selected{% endif %}>{{ location.name }}</option>{% endfor %}</select></div>
+        {% elif selected_location %}<input type="hidden" name="location" value="{{ selected_location.pk }}">{% endif %}
+        <button type="submit" class="refresh"><span aria-hidden="true">↻</span> 更新</button>
+      </form>
+    </section>
+    <div class="status-grid">
+      <section class="card occupancy-card" aria-labelledby="occupancy-heading">
+        <h2 id="occupancy-heading" class="badge"><span class="dot" aria-hidden="true"></span>現在の混雑度</h2>
+        {% if latest %}
+          {% if occupancy != None %}<p class="percentage">{{ occupancy|floatformat:-1 }}<span>%</span></p>{% else %}<p class="empty-value">算出不可</p>{% endif %}
+          <p class="people">利用人数 <strong>{{ latest.user_count }}人</strong><span>／定員 {{ selected_location.capacity }}人</span></p>
+          {% if selected_location.capacity <= 0 %}<p class="muted">定員が0以下のため、混雑率を算出できません。</p>{% endif %}
+        {% else %}
+          <p class="empty-value">未計測</p><p class="muted">{% if selected_location %}この場所の混雑記録はまだありません。{% else %}場所を登録すると混雑状況を確認できます。{% endif %}</p>
+        {% endif %}
+      </section>
+      <section class="card detail-card" aria-labelledby="trend-heading">
+        <h2 id="trend-heading"><span class="clock-icon" aria-hidden="true">↗</span>利用人数の推移</h2>
+        {% if history %}
+        <p class="chart-caption">直近{{ history|length }}件の計測記録・日本時間</p>
+        <svg class="trend-chart" viewBox="0 0 680 300" role="img" aria-labelledby="chart-title chart-description">
+          <title id="chart-title">利用人数の推移</title><desc id="chart-description">横軸は計測日時、縦軸は利用人数です。各棒の詳細は下の計測記録一覧で確認できます。</desc>
+          <text x="12" y="24" class="axis-label">利用人数（人）</text>
+          {% for tick in chart_ticks %}<line x1="60" x2="620" y1="{{ tick.y }}" y2="{{ tick.y }}" class="grid-line"/><text x="48" y="{{ tick.y|add:5 }}" text-anchor="end" class="axis-label">{{ tick.value }}</text>{% endfor %}
+          {% localize off %}{% for point in chart_points %}
+          <rect x="{{ point.left }}" y="{{ point.y }}" width="{{ point.width }}" height="{{ point.height }}" rx="5" class="trend-bar"><title>{% timezone "Asia/Tokyo" %}{{ point.record.recorded_at|date:'Y/m/d H:i:s' }}{% endtimezone %} / {{ point.record.user_count }}人</title></rect>
+          {% if point.record.user_count == 0 %}<text x="{{ point.x }}" y="230" text-anchor="middle" class="axis-label">0人</text>{% endif %}
+          {% if point.show_label %}{% timezone "Asia/Tokyo" %}<text x="{{ point.x }}" y="262" text-anchor="middle" class="axis-label"><tspan x="{{ point.x }}">{{ point.record.recorded_at|date:'m/d' }}</tspan><tspan x="{{ point.x }}" dy="15">{{ point.record.recorded_at|date:'H:i:s' }}</tspan></text>{% endtimezone %}{% endif %}
+          {% endfor %}{% endlocalize %}
+          <text x="340" y="294" text-anchor="middle" class="axis-label">計測日時（日本時間）</text>
+        </svg>
+        <details class="record-details"><summary>計測記録一覧</summary><div class="table-scroll"><table><thead><tr><th scope="col">計測日時（日本時間）</th><th scope="col">利用人数</th></tr></thead><tbody>{% for record in history %}<tr><td>{% timezone "Asia/Tokyo" %}{{ record.recorded_at|date:'Y/m/d H:i:s' }}{% endtimezone %}</td><td>{{ record.user_count }}人</td></tr>{% endfor %}</tbody></table></div></details>
+        {% else %}<p class="no-measurement">対象期間のデータが存在しません</p><p class="chart-caption">表示対象：選択した場所の直近20件の計測記録</p>{% endif %}
+      </section>
+    </div>
+    <aside class="help" id="help"><div class="help-icon" aria-hidden="true">?</div><div><h3>表示について</h3><p>混雑率は最新記録の利用人数 ÷ 場所の現在の定員 × 100で算出します。「更新」で人数・混雑率・グラフをまとめて更新します。</p><p>グラフは過去の計測結果です。定員を変更しても過去記録の保存済み混雑率は変更しません。記録時点の状況のため、現在の実際の人数とは異なる場合があります。</p></div></aside>
+    <nav class="actions" aria-label="画面メニュー">
+      <a href="#help" class="action"><span aria-hidden="true">ⓘ</span>ヘルプ</a>
+      <a href="{% url 'admin:index' %}" class="action admin-action"><span aria-hidden="true">⚙</span>管理者ページ</a>
+    </nav>
+  </main>
+</body>
+</html>

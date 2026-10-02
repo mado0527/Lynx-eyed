@@ -1,4 +1,6 @@
+from django.core.validators import MinValueValidator
 from django.db import models
+from .calculations import calculate_crowd_rate
 
 
 # 1. 管理者情報テーブル (admin_info)
@@ -98,13 +100,50 @@ class CrowdLog(models.Model):
     location = models.ForeignKey(
         LocationMaster, on_delete=models.CASCADE, db_column='location_id', verbose_name="場所ID"
     )
-    user_count = models.IntegerField(verbose_name="利用者数")
-    crowd_rate = models.FloatField(verbose_name="混雑率(%)")
+    user_count = models.IntegerField(
+        verbose_name="利用者数",
+        validators=[MinValueValidator(0, message="利用者人数は0以上で入力してください。")],
+    )
+    crowd_rate = models.FloatField(verbose_name="混雑率(%)", null=True, blank=True, editable=False)
     recorded_at = models.DateTimeField(verbose_name="記録日時")
+
+    def save(self, *args, **kwargs):
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None and not update_fields:
+            return
+        previous = None
+        if not self._state.adding:
+            previous = type(self).objects.using(kwargs.get('using') or self._state.db).filter(
+                pk=self.pk,
+            ).values('user_count', 'location_id', 'crowd_rate').first()
+        changes_inputs = previous is None or (
+            (update_fields is None or 'user_count' in update_fields)
+            and previous['user_count'] != self.user_count
+        ) or (
+            (update_fields is None or 'location' in update_fields or 'location_id' in update_fields)
+            and previous['location_id'] != self.location_id
+        )
+        if changes_inputs:
+            count = self.user_count if update_fields is None or previous is None or 'user_count' in update_fields else previous['user_count']
+            location_id = self.location_id if update_fields is None or previous is None or {'location', 'location_id'} & set(update_fields) else previous['location_id']
+            capacity = LocationMaster.objects.using(kwargs.get('using') or self._state.db).values_list('capacity', flat=True).get(pk=location_id)
+            rate = calculate_crowd_rate(count, capacity)
+            self.crowd_rate = float(rate) if rate is not None else None
+            if update_fields is not None:
+                kwargs['update_fields'] = set(update_fields) | {'crowd_rate'}
+        elif previous is not None:
+            self.crowd_rate = previous['crowd_rate']
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table = 'crowd_log'
         verbose_name = '混雑状況記録'
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(user_count__gte=0),
+                name='crowd_log_user_count_nonnegative',
+            ),
+        ]
 
 
 # 6. 混雑予測情報テーブル (crowd_prediction)
