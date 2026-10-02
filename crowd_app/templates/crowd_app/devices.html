@@ -1,0 +1,9 @@
+{% load static tz %}
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>端末情報管理 | Lynx-eyed</title><link rel="stylesheet" href="{% static 'crowd_app/home.css' %}"></head><body><main class="container">
+<header class="header"><div class="page-heading"><a class="icon-button back-link" href="{% url 'admin:index' %}" aria-label="管理者ページに戻る">←</a><div><h1>端末情報管理</h1><p class="muted">登録済みの情報</p></div></div></header>
+<p class="notice">自動監視は未実装です。以下はDBに保存された情報であり、現在の稼働状態を保証するものではありません。</p>
+<div class="guide-grid">
+<section class="card guide-card"><h2>▣ カメラ情報</h2>{% for camera in cameras %}<dl class="device-data"><dt>デバイス名</dt><dd>{{ camera.name }}</dd><dt>場所</dt><dd>{{ camera.location.name }}</dd><dt>種類</dt><dd>{{ camera.get_camera_type_display }}</dd><dt>登録上の状態</dt><dd>{{ camera.get_status_display }}</dd><dt>モデル・解像度</dt><dd>未実装（登録項目なし）</dd></dl>{% empty %}<p>カメラが未登録です。</p>{% endfor %}</section>
+<section class="card guide-card"><h2>ⓘ ネットワーク・システム情報</h2>{% for device in devices %}<dl class="device-data"><dt>端末名</dt><dd>{{ device.name }}</dd><dt>登録上の接続状態</dt><dd>{{ device.get_network_status_display }}</dd><dt>CPU使用率</dt><dd>{{ device.cpu_usage }}%</dd><dt>ストレージ使用率</dt><dd>{{ device.storage_usage }}%</dd><dt>最終確認日時（日本時間）</dt><dd>{% timezone "Asia/Tokyo" %}{{ device.checked_at|date:'Y/m/d H:i:s' }}{% endtimezone %}</dd><dt>IP・信号強度・メモリ・稼働時間</dt><dd>未実装（登録項目なし）</dd></dl>{% empty %}<p>端末が未登録です。</p>{% endfor %}</section>
+</div><nav class="actions"><a class="action" href="{% url 'admin:crowd_app_deviceinfo_changelist' %}">端末の登録・編集</a><a class="action" href="{% url 'admin:index' %}">管理者ページに戻る</a></nav>
+</main></body></html>

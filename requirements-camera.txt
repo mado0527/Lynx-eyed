@@ -1,0 +1,3 @@
+# Optional Windows camera preview dependencies, separate from Django runtime.
+opencv-python==5.0.0.93
+ultralytics==8.4.171

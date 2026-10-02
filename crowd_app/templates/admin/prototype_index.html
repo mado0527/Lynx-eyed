@@ -1,0 +1,11 @@
+{% extends "admin/index.html" %}
+{% load static %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'crowd_app/admin-design.css' %}">{% endblock %}
+{% block content %}
+<div class="prototype-admin">
+<h1>管理者ダッシュボード</h1><p class="dashboard-subtitle">システム管理</p>
+<div class="dashboard-grid"><section class="dashboard-card"><h2>月次レポート</h2><span class="pending">自動集計・グラフは未実装</span><p>集計値や利用者数を架空の値で表示しません。登録済みレポートは下のモデル一覧から確認できます。</p></section><section class="dashboard-card"><h2>通知設定</h2><span class="pending">未実装</span><p>混雑アラート・カメラ通知・AI予測レポートの通知機能は未実装です。</p></section></div>
+<div class="dashboard-actions"><a href="{% url 'devices' %}">端末情報管理 →</a><a href="{% url 'home' %}">利用者トップ画面 →</a></div>
+</div>
+{{ block.super }}
+{% endblock %}

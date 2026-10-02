@@ -16,9 +16,16 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from crowd_app.views import home
+from crowd_app.views import home, information_page, device_management
+from django.views.generic import RedirectView
 
 urlpatterns = [
     path('', home, name='home'),
+    path('prediction-graph/', information_page, {'page': 'prediction'}, name='prediction'),
+    path('weekly-graph/', information_page, {'page': 'weekly'}, name='weekly'),
+    path('live/', information_page, {'page': 'live'}, name='live'),
+    path('help/', information_page, {'page': 'help'}, name='help'),
+    path('device-management/', device_management, name='devices'),
+    path('login/', RedirectView.as_view(pattern_name='admin:login', permanent=False)),
     path('admin/', admin.site.urls),
 ]

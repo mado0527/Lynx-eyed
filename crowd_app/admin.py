@@ -1,5 +1,9 @@
 from django.contrib import admin
 from django import forms
+admin.site.index_template = 'admin/prototype_index.html'
+admin.site.login_template = 'crowd_app/admin_login.html'
+admin.site.site_header = 'Lynx-eyed 管理者ページ'
+admin.site.site_title = 'Lynx-eyed'
 from .models import (
     AdminInfo, LocationMaster, DeviceInfo, CameraInfo, 
     CrowdLog, CrowdPrediction, WeeklySummaryLog, 

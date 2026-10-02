@@ -234,3 +234,37 @@ class AutomaticCrowdRateTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         saved = form.save()
         self.assertEqual(saved.crowd_rate, 40)
+
+
+class MockupScreenTests(TestCase):
+    def test_public_pages_and_navigation(self):
+        for name in ('prediction', 'weekly', 'live', 'help'):
+            response = self.client.get(reverse(name))
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, '未実装')
+            self.assertContains(response, 'name="viewport"')
+        self.assertContains(self.client.get(reverse('prediction')), reverse('weekly'))
+        self.assertNotContains(self.client.get(reverse('live')), '稼働中')
+        self.assertContains(self.client.get('/'), reverse('prediction'))
+        self.assertContains(self.client.get('/'), reverse('live'))
+        self.assertContains(self.client.get('/'), 'type="submit"', count=1)
+
+    def test_authentication_and_admin_templates(self):
+        self.assertRedirects(self.client.get('/login/'), '/admin/login/')
+        response = self.client.get('/admin/login/')
+        self.assertContains(response, 'csrfmiddlewaretoken')
+        self.assertContains(response, 'admin-design.css')
+        response = self.client.get(reverse('devices'))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response['Location'].startswith('/admin/login/'))
+        user = get_user_model().objects.create_superuser(username='design_admin', password='test-only-password')
+        self.client.force_login(user)
+        response = self.client.get('/admin/')
+        self.assertContains(response, '管理者ダッシュボード')
+        self.assertContains(response, reverse('admin:crowd_app_crowdlog_changelist'))
+        self.assertEqual(self.client.get(reverse('devices')).status_code, 200)
+
+    def test_staff_without_model_permissions_cannot_view_devices(self):
+        user = get_user_model().objects.create_user(username='limited_staff', is_staff=True)
+        self.client.force_login(user)
+        self.assertEqual(self.client.get(reverse('devices')).status_code, 403)

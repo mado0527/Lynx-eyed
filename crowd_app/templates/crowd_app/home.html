@@ -11,16 +11,15 @@
   <main class="container">
     <header class="header">
       <div><h1>ラウンジモニター</h1><p class="muted">混雑状況確認システム</p></div>
-      <div class="header-refresh"><div class="last-measured">最終計測日時<br>{% if latest %}{% timezone "Asia/Tokyo" %}<time datetime="{{ latest.recorded_at|date:'c' }}">{{ latest.recorded_at|date:'Y/m/d H:i:s' }}</time>（日本時間）{% endtimezone %}{% else %}未計測{% endif %}</div></div>
+      <div class="header-refresh"><div class="last-measured">最終計測日時<br>{% if latest %}{% timezone "Asia/Tokyo" %}<time datetime="{{ latest.recorded_at|date:'c' }}">{{ latest.recorded_at|date:'Y/m/d H:i:s' }}</time>（日本時間）{% endtimezone %}{% else %}未計測{% endif %}</div><button type="submit" form="location-form" class="icon-button" aria-label="更新" title="最新記録に更新"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg></button><span class="unimplemented-badge">自動検知：未実装</span></div>
     </header>
     {% if invalid_location %}<p class="notice" role="status">指定された場所が見つかりません。登録済みの場所を表示しています。</p>{% endif %}
     <section class="location-card" aria-label="場所の選択と更新">
       {% if not selected_location %}<div><h2>場所が未登録です</h2></div>{% endif %}
-      <form action="{% url 'home' %}" method="get" class="controls">
+      <form id="location-form" action="{% url 'home' %}" method="get" class="controls">
         {% if locations|length > 1 %}
         <div class="select-field"><label for="location">表示する場所</label><select id="location" name="location">{% for location in locations %}<option value="{{ location.pk }}"{% if location.pk == selected_location.pk %} selected{% endif %}>{{ location.name }}</option>{% endfor %}</select></div>
         {% elif selected_location %}<input type="hidden" name="location" value="{{ selected_location.pk }}">{% endif %}
-        <button type="submit" class="refresh"><span aria-hidden="true">↻</span> 更新</button>
       </form>
     </section>
     <div class="status-grid">
@@ -53,9 +52,11 @@
         {% else %}<p class="no-measurement">対象期間のデータが存在しません</p><p class="chart-caption">表示対象：選択した場所の直近20件の計測記録</p>{% endif %}
       </section>
     </div>
-    <aside class="help" id="help"><div class="help-icon" aria-hidden="true">?</div><div><h3>表示について</h3><p>混雑率は最新記録の利用人数 ÷ 場所の現在の定員 × 100で算出します。「更新」で人数・混雑率・グラフをまとめて更新します。</p><p>グラフは過去の計測結果です。定員を変更しても過去記録の保存済み混雑率は変更しません。記録時点の状況のため、現在の実際の人数とは異なる場合があります。</p></div></aside>
+    <aside class="help prediction-panel"><div class="help-icon" aria-hidden="true">↗</div><div><h3>AI予測 <span class="unimplemented-badge">未実装</span></h3><p>混雑予測は未実装です。上のグラフは実際の過去の計測記録です。</p></div></aside>
     <nav class="actions" aria-label="画面メニュー">
-      <a href="#help" class="action"><span aria-hidden="true">ⓘ</span>ヘルプ</a>
+      <a href="{% url 'prediction' %}" class="action primary"><span aria-hidden="true">↗</span><span class="action-text">混雑予測グラフを見る<small>未実装</small></span></a>
+      <a href="{% url 'live' %}" class="action"><span aria-hidden="true">▣</span><span class="action-text">ライブ映像を見る<small>未実装</small></span></a>
+      <a href="{% url 'help' %}" class="action"><span aria-hidden="true">ⓘ</span>ヘルプ</a>
       <a href="{% url 'admin:index' %}" class="action admin-action"><span aria-hidden="true">⚙</span>管理者ページ</a>
     </nav>
   </main>
