@@ -13,11 +13,17 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = ROOT / '.camera-runtime' / 'config'
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault('YOLO_CONFIG_DIR', str(CONFIG_DIR))
+sys.path.insert(0, str(ROOT))
+from tools.camera_masking import load_mask, apply_mask, select_mask, comparison_image, ComparisonEvidence
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='OpenCV / YOLO11n preview. No masking; DB save is opt-in.')
+    parser = argparse.ArgumentParser(description='OpenCV / YOLO11n preview. Optional exclusion masks; DB save is opt-in.')
+    parser.add_argument('--mask-config', type=Path, help='JSON exclusion rectangles in original frame pixels')
+    parser.add_argument('--select-mask', type=Path, help='Interactively select rectangles and create a NEW JSON file; no DB writes')
+    parser.add_argument('--compare-mask', action='store_true', help='Compare identical frame before/after masking; local evidence only, NEVER DB')
     parser.add_argument('--source', default='http://192.168.0.134:8080/?action=stream')
+    parser.add_argument('--image', type=Path, help='Local demo image; process once, NEVER write DB')
     parser.add_argument('--capture-only', action='store_true', help='Verify frame acquisition without loading YOLO')
     parser.add_argument('--headless', action='store_true', help='Verify without opening a preview window')
     parser.add_argument('--max-frames', type=int, default=0, help='Stop after N successful frames; 0 means continuous')
@@ -35,6 +41,14 @@ def parse_args():
     parser.add_argument('--device', default='cpu')
     parser.add_argument('--model', type=Path, default=ROOT / '.camera-runtime' / 'models' / 'yolo11n.pt')
     args = parser.parse_args()
+    if args.image and args.save_db:
+        parser.error('Demo images cannot be combined with --save-db')
+    if (args.compare_mask or args.select_mask) and args.save_db:
+        parser.error('Mask comparison/selection cannot be combined with --save-db')
+    if args.compare_mask and (args.mask_config is None or args.capture_only or args.select_mask):
+        parser.error('--compare-mask requires --mask-config and detection mode')
+    if args.select_mask and (args.headless or args.mask_config):
+        parser.error('--select-mask requires a GUI and cannot be combined with --mask-config')
     if args.interval <= 0 or args.max_records < 0:
         parser.error('interval must be positive; max-records must be nonnegative')
     if args.save_db and (args.location_id is None or args.location_id <= 0 or args.capture_only):
@@ -44,6 +58,23 @@ def parse_args():
     if args.timeout <= 0 or args.max_frames < 0 or args.imgsz <= 0 or not 0 < args.conf <= 1 or not 0 < args.iou <= 1 or args.max_images < 1:
         parser.error('timeout/imgsz/max-images must be positive, max-frames nonnegative, conf/iou in (0, 1]')
     return args
+
+
+class ImageInput:
+    """Unicode-safe local image input with the capture interface."""
+    def __init__(self, path):
+        import cv2
+        import numpy as np
+        self.frame = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_COLOR)
+
+    def isOpened(self):
+        return self.frame is not None and self.frame.size > 0
+
+    def read(self):
+        return self.isOpened(), self.frame
+
+    def release(self):
+        pass
 
 
 class ChangeSnapshots:
@@ -76,7 +107,8 @@ class ChangeSnapshots:
         metadata = {
             'captured_at': datetime.now().astimezone().isoformat(),
             'previous_count': previous, 'count': count, 'conf': self.args.conf,
-            'iou': self.args.iou, 'imgsz': self.args.imgsz, 'masking': False,
+            'iou': self.args.iou, 'imgsz': self.args.imgsz, 'masking': bool(getattr(self.args, 'mask_config', None)),
+            'mask_config': str(getattr(self.args, 'mask_config', None)),
             'model': self.args.model.name,
             'boxes': result.boxes.xyxy.cpu().tolist(),
             'scores': result.boxes.conf.cpu().tolist(),
@@ -90,17 +122,25 @@ class ChangeSnapshots:
 
 def run(args):
     import cv2
+    compare = getattr(args, 'compare_mask', False)
+    selection = getattr(args, 'select_mask', None)
+    image_path = getattr(args, 'image', None)
+    if (compare or selection or image_path) and args.save_db:
+        raise ValueError('Mask comparison/selection/demo images never permit DB writes')
+    if image_path and not Path(image_path).is_file():
+        logging.error('Image file not found: %s. Specify the actual filename and extension (.png / .jpg). No DB writes.', image_path)
+        return 1
     recorder = None
     records = 0
     if args.save_db:
         sys.path.insert(0, str(ROOT))
         from tools.db_recording import CrowdRecorder
         recorder = CrowdRecorder(args.location_id)
-        logging.info('DB enabled: location_id=%d name=%s interval=%ss (no masking)',
+        logging.info('DB enabled: location_id=%d name=%s interval=%ss',
                      recorder.location.pk, recorder.location.name, args.interval)
     timeout_ms = int(args.timeout * 1000)
-    logging.info('Opening input (no masking; DB writes %s)', 'enabled' if recorder else 'disabled')
-    capture = cv2.VideoCapture(args.source, cv2.CAP_FFMPEG, [
+    logging.info('Opening input (DB writes %s)', 'enabled' if recorder else 'disabled')
+    capture = ImageInput(image_path) if image_path else cv2.VideoCapture(args.source, cv2.CAP_FFMPEG, [
         cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, timeout_ms,
         cv2.CAP_PROP_READ_TIMEOUT_MSEC, timeout_ms,
     ])
@@ -115,6 +155,24 @@ def run(args):
             logging.error('First frame acquisition failed. Nothing saved.')
             return 1
         logging.info('Frame acquired: %dx%d', frame.shape[1], frame.shape[0])
+        if selection:
+            if Path(selection).exists():
+                logging.error('Mask file already exists: %s. Use a new filename; existing settings are retained.', selection)
+                return 1
+            logging.info('Drag exclusion regions; Enter/Space accepts each, Esc finishes. S confirms save; Esc cancels. No DB writes.')
+            saved_mask = select_mask(frame, selection)
+            logging.info('Mask configuration %s: %s', 'saved' if saved_mask else 'cancelled', selection)
+            return 0
+        try:
+            mask = load_mask(getattr(args, 'mask_config', None), frame.shape)
+        except FileNotFoundError:
+            logging.error('Mask file not found: %s. First use --select-mask with this image, then press S in the confirmation window to save.', getattr(args, 'mask_config', None))
+            return 1
+        except (ValueError, OSError) as exc:
+            logging.error('Mask configuration rejected (%s). Verify file format, coordinates and input resolution; nothing saved.', type(exc).__name__)
+            return 1
+        mask_label = 'Masked' if mask['rectangles'] else 'No masking'
+        logging.info('Exclusion rectangles=%d; coordinates are not automatically chosen', len(mask['rectangles']))
         measured_at = datetime.now(timezone.utc)
         model = None
         if not args.capture_only:
@@ -131,16 +189,20 @@ def run(args):
             cv2.resizeWindow(window, 960, 540)
         frames = 0
         last_log = 0
-        snapshots = ChangeSnapshots(args) if args.save_changes and model is not None else None
+        snapshots = ChangeSnapshots(args) if args.save_changes and model is not None and not compare else None
+        evidence = ComparisonEvidence(args, mask) if compare else None
         logging.info('Detection settings: confidence=%s NMS IoU=%s', args.conf, args.iou)
         next_measurement = 0
         count = None
         while True:
             if model is None:
-                preview = frame.copy()
-                text = 'Capture OK | No masking | NO DB SAVE'
+                preview = apply_mask(frame, mask)
+                text = f'Capture OK | {mask_label} | NO DB SAVE'
             elif recorder is None or time.monotonic() >= next_measurement:
-                result = model.predict(frame, classes=[0], conf=args.conf, iou=args.iou, imgsz=args.imgsz,
+                masked = apply_mask(frame, mask)
+                before = model.predict(frame.copy(), classes=[0], conf=args.conf, iou=args.iou,
+                                       imgsz=args.imgsz, device=args.device, verbose=False, save=False)[0] if compare else None
+                result = model.predict(masked, classes=[0], conf=args.conf, iou=args.iou, imgsz=args.imgsz,
                                        device=args.device, verbose=False, save=False)[0]
                 count = len(result.boxes)
                 if recorder is not None:
@@ -151,23 +213,31 @@ def run(args):
                                  saved.recorded_at.isoformat())
                     next_measurement = time.monotonic() + args.interval
                 preview = result.plot()
+                if compare:
+                    preview = comparison_image(before, result)
+                    evidence.consider(frame, before, result, preview, measured_at)
+                    if frames == 0 or time.monotonic() - last_log >= 2:
+                        logging.info('Same-frame comparison: before=%d masked=%d; NO DB SAVE', len(before.boxes), count)
                 if snapshots is not None:
                     snapshots.consider(frame, result, count)
-                text = f'Persons: {count} | No masking | {status}'
+                text = f'Persons: {count} | {mask_label} | {status}'
                 if time.monotonic() - last_log >= 2 or frames == 0:
                     logging.info('Inference OK: persons=%d (%s)', count, 'DB saved' if recorder else 'not saved')
                     last_log = time.monotonic()
             else:
                 preview = frame.copy()
                 text = f'Last measured: {count} | Waiting for next measurement | {status}'
-            cv2.rectangle(preview, (0, 0), (preview.shape[1], 42), (25, 25, 25), -1)
-            cv2.putText(preview, text, (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
+            if not compare:
+                cv2.rectangle(preview, (0, 0), (preview.shape[1], 42), (25, 25, 25), -1)
+                cv2.putText(preview, text, (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
             frames += 1
             if not args.headless:
                 cv2.imshow(window, preview)
-                key = cv2.waitKey(1) & 0xFF
+                key = cv2.waitKey(0 if image_path else 1) & 0xFF
                 if key in (27, ord('q'), ord('Q')) or cv2.getWindowProperty(window, cv2.WND_PROP_VISIBLE) < 1:
                     break
+            if image_path:
+                break
             if args.max_frames and frames >= args.max_frames:
                 break
             if args.max_records and records >= args.max_records:
@@ -178,6 +248,8 @@ def run(args):
                 return 1
             measured_at = datetime.now(timezone.utc)
         logging.info('Preview finished: %d frames; DB records=%d; snapshot images=%d', frames, records, snapshots.saved if snapshots else 0)
+        if evidence:
+            logging.info('Comparison evidence: %d/%d pairs at %s (NO DB SAVE)', evidence.saved, args.max_images, evidence.directory)
         return 0
     finally:
         capture.release()
