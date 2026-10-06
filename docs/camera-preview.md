@@ -37,7 +37,7 @@ Invoke-WebRequest -Uri 'https://github.com/ultralytics/assets/releases/download/
 .venv/Scripts/python.exe tools/camera_preview.py --capture-only
 ```
 
-入力元の既定値は`http://192.168.0.134:8080/?action=stream`です。
+入力元の既定値は`http://192.168.0.151:8080/?action=stream`です。
 変更する場合は`--source 'http://.../?action=stream'`を指定します。
 Windows PCとPiが同じネットワークにあること、PiのIP・ポート・配信起動状態を確認してください。
 ブラウザーで動いてもPythonから到達できなければ、端末やネットワーク、Pythonのファイアウォール設定の違いを確認します。防御設定を一括解除しないでください。

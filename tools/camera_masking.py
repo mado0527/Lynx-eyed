@@ -1,5 +1,6 @@
 """Pixel-coordinate exclusion masks and local comparison evidence; no DB access."""
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
@@ -35,7 +36,7 @@ def apply_mask(frame, config):
     return masked
 
 
-def select_mask(frame, path):
+def select_mask(frame, path, confirm_in_terminal=False):
     import cv2
     path = Path(path)
     if path.exists():
@@ -43,6 +44,7 @@ def select_mask(frame, path):
     title = 'Select exclusion rectangles: drag, Enter/Space next, Esc finish'
     cv2.namedWindow(title, cv2.WINDOW_NORMAL)
     rectangles = cv2.selectROIs(title, frame, showCrosshair=True, fromCenter=False)
+    logging.info('ROI selection finished: %d rectangles. Opening confirmation; click that window and press S to save.', len(rectangles))
     cv2.destroyWindow(title)
     config = {'width': frame.shape[1], 'height': frame.shape[0],
               'rectangles': [[int(v) for v in rect] for rect in rectangles]}
@@ -50,7 +52,19 @@ def select_mask(frame, path):
     title = 'Mask confirmation: S save / Esc cancel (NO DB SAVE)'
     cv2.namedWindow(title, cv2.WINDOW_NORMAL)
     cv2.imshow(title, preview)
-    while cv2.getWindowProperty(title, cv2.WND_PROP_VISIBLE) >= 1:
+    if confirm_in_terminal:
+        cv2.waitKey(100)  # Paint the confirmation image before waiting on stdin.
+        answer = input('Return to PowerShell. Save these mask regions? Type SAVE then Enter (anything else cancels): ')
+        if answer.strip().upper() != 'SAVE':
+            return False
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open('x', encoding='utf-8') as output:
+            json.dump(config, output, indent=2)
+        logging.info('Mask file created and verified: %s (%d bytes)', path.resolve(), path.stat().st_size)
+        return True
+    # HighGUI needs waitKey to process creation/paint events before visibility checks.
+    # Checking visibility immediately after imshow can incorrectly cancel a new window.
+    while True:
         key = cv2.waitKey(100) & 0xff
         if key in (ord('s'), ord('S')):
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -58,6 +72,10 @@ def select_mask(frame, path):
                 json.dump(config, output, indent=2)
             return True
         if key in (27, ord('q'), ord('Q')):
+            logging.info('Mask confirmation cancelled by key; configuration was not written.')
+            break
+        if cv2.getWindowProperty(title, cv2.WND_PROP_VISIBLE) < 1:
+            logging.info('Mask confirmation window closed; configuration was not written.')
             break
     return False
 

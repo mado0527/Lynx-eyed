@@ -40,6 +40,10 @@ class MaskTests(unittest.TestCase):
                 self.assertTrue(select_mask(frame, path))
                 with self.assertRaises(FileExistsError):
                     select_mask(frame, path)
+                terminal_path = Path(directory) / 'terminal-mask.json'
+                with patch('builtins.input', return_value='SAVE'):
+                    self.assertTrue(select_mask(frame, terminal_path, confirm_in_terminal=True))
+                self.assertEqual(load_mask(terminal_path, frame.shape)['rectangles'], [[5, 10, 20, 30]])
             self.assertEqual(load_mask(path, frame.shape)['rectangles'], [[5, 10, 20, 30]])
 
     def test_no_config_preserves_pixels_and_original(self):

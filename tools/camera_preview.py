@@ -21,8 +21,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description='OpenCV / YOLO11n preview. Optional exclusion masks; DB save is opt-in.')
     parser.add_argument('--mask-config', type=Path, help='JSON exclusion rectangles in original frame pixels')
     parser.add_argument('--select-mask', type=Path, help='Interactively select rectangles and create a NEW JSON file; no DB writes')
+    parser.add_argument('--confirm-mask-in-terminal', action='store_true', help='Confirm selected rectangles in PowerShell instead of using S in the image window')
     parser.add_argument('--compare-mask', action='store_true', help='Compare identical frame before/after masking; local evidence only, NEVER DB')
-    parser.add_argument('--source', default='http://192.168.0.134:8080/?action=stream')
+    parser.add_argument('--source', default='http://192.168.0.151:8080/?action=stream')
     parser.add_argument('--image', type=Path, help='Local demo image; process once, NEVER write DB')
     parser.add_argument('--capture-only', action='store_true', help='Verify frame acquisition without loading YOLO')
     parser.add_argument('--headless', action='store_true', help='Verify without opening a preview window')
@@ -41,6 +42,8 @@ def parse_args():
     parser.add_argument('--device', default='cpu')
     parser.add_argument('--model', type=Path, default=ROOT / '.camera-runtime' / 'models' / 'yolo11n.pt')
     args = parser.parse_args()
+    if args.confirm_mask_in_terminal and not args.select_mask:
+        parser.error('--confirm-mask-in-terminal requires --select-mask')
     if args.image and args.save_db:
         parser.error('Demo images cannot be combined with --save-db')
     if (args.compare_mask or args.select_mask) and args.save_db:
@@ -160,7 +163,7 @@ def run(args):
                 logging.error('Mask file already exists: %s. Use a new filename; existing settings are retained.', selection)
                 return 1
             logging.info('Drag exclusion regions; Enter/Space accepts each, Esc finishes. S confirms save; Esc cancels. No DB writes.')
-            saved_mask = select_mask(frame, selection)
+            saved_mask = select_mask(frame, selection, confirm_in_terminal=getattr(args, 'confirm_mask_in_terminal', False))
             logging.info('Mask configuration %s: %s', 'saved' if saved_mask else 'cancelled', selection)
             return 0
         try:
