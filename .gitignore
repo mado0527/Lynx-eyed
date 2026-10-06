@@ -150,7 +150,6 @@ activemq-data/
 # Environments
 .env
 .camera-runtime/
-.env.example
 .envrc
 .venv
 env/
