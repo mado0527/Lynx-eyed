@@ -4,7 +4,103 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import PermissionDenied
 from .calculations import calculate_crowd_rate
 
-from .models import CrowdLog, LocationMaster, DeviceInfo, CameraInfo
+from .models import CrowdLog, CrowdPrediction, LocationMaster, DeviceInfo, CameraInfo
+from .prediction_chart import chart_series
+from datetime import datetime, time, timedelta
+from django.utils import timezone
+from django.db.models import Avg, Count
+from django.db.models.functions import ExtractIsoWeekDay
+import math
+
+
+@never_cache
+def prediction_graph(request):
+    locations = list(LocationMaster.objects.order_by('location_id'))
+    selected = next((row for row in locations if str(row.pk) == request.GET.get('location')), None)
+    invalid_location = 'location' in request.GET and selected is None
+    selected = selected or (locations[0] if locations else None)
+    now = timezone.now()
+    today = timezone.localdate(now)
+    zone = timezone.get_current_timezone()
+    start = timezone.make_aware(datetime.combine(today, time.min), zone)
+    end = timezone.make_aware(datetime.combine(today + timedelta(days=1), time.min), zone)
+    predictions, actuals = [], []
+    invalid_predictions = 0
+    if selected:
+        queryset = CrowdPrediction.objects.filter(location=selected, predicted_at__gt=now, predicted_at__lt=end)
+        invalid_predictions = queryset.filter(expected_count__lt=0).count()
+        # IDs resolve duplicates deterministically, without claiming a creation date.
+        by_target = {}
+        for row in queryset.filter(expected_count__gte=0).order_by('predicted_at', 'prediction_id'):
+            by_target[row.predicted_at] = row
+        predictions = list(by_target.values())
+        by_time = {}
+        for row in CrowdLog.objects.filter(location=selected, recorded_at__gte=start, recorded_at__lte=now).order_by('recorded_at', 'log_id'):
+            by_time[row.recorded_at] = row
+        actuals = list(by_time.values())
+    times = [timezone.localtime(row.predicted_at) for row in predictions] + [timezone.localtime(row.recorded_at) for row in actuals]
+    start_hour = min([9] + [at.hour for at in times])
+    end_hour = max([18] + [math.ceil(at.hour + at.minute / 60 + at.second / 3600 + at.microsecond / 3_600_000_000) for at in times])
+    max_count = max([40] + [row.expected_count for row in predictions] + [row.user_count for row in actuals])
+    step = max(10, math.ceil(max_count / 4 / 10) * 10)
+    ceiling = step * 4
+    forecast_points, forecast_path = chart_series(predictions, 'predicted_at', 'expected_count', start_hour, end_hour, ceiling)
+    actual_points, actual_path = chart_series(actuals, 'recorded_at', 'user_count', start_hour, end_hour, ceiling)
+    label_stride = math.ceil((end_hour - start_hour) / 4)
+    ticks = [{'left': (hour - start_hour) / (end_hour - start_hour) * 100,
+              'label': f'{hour}:00', 'compact': hour in (start_hour, end_hour) or
+              (index % label_stride == 0 and end_hour - hour >= label_stride)}
+             for index, hour in enumerate(range(start_hour, end_hour + 1))]
+    peak = max(predictions, key=lambda row: row.expected_count) if predictions else None
+    return render(request, 'crowd_app/prediction.html', {
+        'selected_location': selected, 'invalid_location': invalid_location,
+        'today': today, 'now': now, 'forecast_points': forecast_points, 'forecast_path': forecast_path,
+        'actual_points': actual_points, 'actual_path': actual_path, 'ticks': ticks,
+        'y_ticks': [step * index for index in range(4, -1, -1)], 'peak': peak,
+        'predictions': predictions, 'actuals': actuals, 'invalid_predictions': invalid_predictions,
+    })
+
+
+@never_cache
+def weekly_graph(request):
+    locations = list(LocationMaster.objects.order_by('location_id'))
+    selected = next((row for row in locations if str(row.pk) == request.GET.get('location')), None)
+    invalid_location = 'location' in request.GET and selected is None
+    selected = selected or (locations[0] if locations else None)
+    periods = [(28, '直近4週間'), (56, '直近8週間'), (84, '直近12週間')]
+    raw_period = request.GET.get('period', '28')
+    invalid_period = raw_period not in ('28', '56', '84')
+    days = int(raw_period) if not invalid_period else 28
+    today = timezone.localdate()
+    start_date = today - timedelta(days=days - 1)
+    zone = timezone.get_current_timezone()
+    start = timezone.make_aware(datetime.combine(start_date, time.min), zone)
+    end = timezone.make_aware(datetime.combine(today + timedelta(days=1), time.min), zone)
+    aggregates = {}
+    if selected:
+        rows = (CrowdLog.objects.filter(location=selected, recorded_at__gte=start, recorded_at__lt=end)
+                .annotate(weekday=ExtractIsoWeekDay('recorded_at', tzinfo=zone))
+                .values('weekday').annotate(average=Avg('user_count'), samples=Count('pk')))
+        aggregates = {row['weekday']: row for row in rows}
+    maximum = max((row['average'] for row in aggregates.values()), default=0)
+    step = max(1, math.ceil(maximum / 4))
+    ceiling = step * 4
+    chart = []
+    for index, day in enumerate('月火水木金土日', 1):
+        row = aggregates.get(index)
+        average = row['average'] if row else None
+        height = average / ceiling * 100 if average is not None else 0
+        chart.append({'day': day, 'average': average, 'samples': row['samples'] if row else 0,
+                      'height': height, 'measured': row is not None})
+    measured = [row for row in chart if row['measured']]
+    busiest = [row['day'] for row in measured if row['average'] == maximum]
+    return render(request, 'crowd_app/weekly.html', {
+        'locations': locations, 'selected_location': selected, 'periods': periods,
+        'period': days, 'start_date': start_date, 'end_date': today, 'chart': chart,
+        'ticks': [step * index for index in range(4, -1, -1)],
+        'samples': sum(row['samples'] for row in measured), 'busiest': busiest,
+        'maximum': maximum, 'invalid_location': invalid_location, 'invalid_period': invalid_period,
+    })
 
 
 @never_cache
@@ -56,8 +152,6 @@ def home(request):
 
 def information_page(request, page):
     pages = {
-        'prediction': ('混雑予測グラフ', '本日の予測データ', '時間帯別の混雑予測', '未来の混雑予測は未実装です。現在表示できるのはトップ画面の実際の計測記録です。'),
-        'weekly': ('曜日ごとのグラフ', '週間平均データ', '曜日別平均利用者数', '曜日別の集計・傾向表示は未実装です。'),
         'live': ('ライブ映像', 'カメラ映像', '映像表示', 'カメラ映像の配信・閲覧は未実装です。'),
         'help': ('ヘルプ', '使い方ガイド', '混雑状況の確認', ''),
     }

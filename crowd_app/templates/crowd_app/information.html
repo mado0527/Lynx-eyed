@@ -4,7 +4,7 @@
 {% if page == 'help' %}
 <div class="guide-grid">
 <section class="card guide-card"><h2>ⓘ 混雑状況の確認</h2><p>トップ画面ではDBの最新記録の人数・混雑率・最終計測日時を表示します。更新ボタンで最新記録と人数推移を再取得します。複数の場所が登録されている場合は場所を選択してください。</p><p>混雑率は利用人数 ÷ 現在の定員 × 100です。0人は0%、定員0以下は算出不可です。過去記録の保存済み混雑率は定員変更で書き換えません。</p><p>未計測は0人と異なります。記録時点の人数のため、実際の現在人数とは異なる場合があります。</p></section>
-<section class="card guide-card"><h2>↗ 混雑予測グラフ</h2><span class="unimplemented-badge">未実装</span><p>未来予測と曜日別傾向の集計は未実装です。トップ画面の棒グラフは過去の計測結果です。</p></section>
+<section class="card guide-card"><h2>↗ 混雑予測グラフ</h2><span class="unimplemented-badge">自動生成は未実装</span><p>予測画面では保存済みの未来の予測と、本日の実績を区別して表示します。予測の作成日時・生成方法は既存モデルに保存されていません。曜日別画面では実記録から平均利用者数を集計します。</p></section>
 <section class="card guide-card"><h2>▣ ライブ映像</h2><span class="unimplemented-badge">未実装</span><p>利用者向けの映像公開は未実装です。別プロセスでの人数検知とDB保存は接続検証中で、マスキングと検知精度は未検証です。稼働状態を保証する表示は行っていません。</p></section>
 <section class="card guide-card"><h2>⚙ 管理者機能</h2><p>管理者ページではDjangoの認証を使用します。権限に応じて場所・カメラ・端末・混雑記録を登録、編集できます。人数を保存すると混雑率を自動計算します。</p><a href="{% url 'admin:index' %}" class="text-link">管理者ページへ →</a></section>
 </div>
@@ -12,5 +12,5 @@
 <section class="card placeholder-card"><h2>{{ panel_title }}</h2><div class="placeholder-area {% if page == 'live' %}video-area{% endif %}"><span class="placeholder-icon" aria-hidden="true">{% if page == 'live' %}▣{% else %}↗{% endif %}</span><strong>未実装</strong><p>{{ message }}</p></div></section>
 <aside class="help"><div class="help-icon" aria-hidden="true">ⓘ</div><div><h3>{% if page == 'live' %}カメラ情報{% elif page == 'weekly' %}週間傾向{% else %}予測のポイント{% endif %}</h3><p>未実装のため、結果や稼働状態は表示できません。</p></div></aside>
 {% endif %}
-<nav class="actions subpage-actions">{% if page == 'prediction' %}<a class="action primary" href="{% url 'weekly' %}">曜日ごとのグラフを見る（未実装）</a>{% endif %}<a class="action" href="{% url 'home' %}">トップ画面に戻る</a></nav>
+<nav class="actions subpage-actions">{% if page == 'prediction' %}<a class="action primary" href="{% url 'weekly' %}">曜日ごとのグラフを見る</a>{% endif %}<a class="action" href="{% url 'home' %}">トップ画面に戻る</a></nav>
 </main></body></html>

@@ -54,9 +54,9 @@
         {% else %}<p class="no-measurement">対象期間のデータが存在しません</p><p class="chart-caption">表示対象：選択した場所の直近20件の計測記録</p>{% endif %}
       </section>
     </div>
-    <aside class="help prediction-panel"><div class="help-icon" aria-hidden="true">↗</div><div><h3>AI予測 <span class="unimplemented-badge">未実装</span></h3><p>混雑予測は未実装です。上のグラフは実際の過去の計測記録です。</p></div></aside>
+    <aside class="help prediction-panel"><div class="help-icon" aria-hidden="true">↗</div><div><h3>混雑予測 <span class="unimplemented-badge">自動生成は未実装</span></h3><p>予測画面で保存済みの未来の予測を確認できます。上のグラフは実際の過去の計測記録です。</p></div></aside>
     <nav class="actions" aria-label="画面メニュー">
-      <a href="{% url 'prediction' %}" class="action primary"><span aria-hidden="true">↗</span><span class="action-text">混雑予測グラフを見る<small>未実装</small></span></a>
+      <a href="{% url 'prediction' %}{% if selected_location %}?location={{ selected_location.pk }}{% endif %}" class="action primary"><span aria-hidden="true">↗</span><span class="action-text">混雑予測グラフを見る</span></a>
       <a href="{% url 'live' %}" class="action"><span aria-hidden="true">▣</span><span class="action-text">ライブ映像を見る<small>未実装</small></span></a>
       <a href="{% url 'help' %}" class="action"><span aria-hidden="true">ⓘ</span>ヘルプ</a>
       <a href="{% url 'admin:index' %}" class="action admin-action"><span aria-hidden="true">⚙</span>管理者ページ</a>

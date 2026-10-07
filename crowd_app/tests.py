@@ -3,10 +3,11 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from datetime import datetime, timezone as datetime_timezone
+from datetime import datetime, timedelta, timezone as datetime_timezone
 from decimal import Decimal
 
-from .models import CrowdLog, LocationMaster
+from .models import CrowdLog, CrowdPrediction, LocationMaster
+from unittest.mock import patch
 
 
 class CrowdLogUserCountTests(TestCase):
@@ -241,7 +242,8 @@ class MockupScreenTests(TestCase):
         for name in ('prediction', 'weekly', 'live', 'help'):
             response = self.client.get(reverse(name))
             self.assertEqual(response.status_code, 200)
-            self.assertContains(response, '未実装')
+            if name != 'weekly':
+                self.assertContains(response, '未実装')
             self.assertContains(response, 'name="viewport"')
         self.assertContains(self.client.get(reverse('prediction')), reverse('weekly'))
         self.assertNotContains(self.client.get(reverse('live')), '稼働中')
@@ -268,6 +270,141 @@ class MockupScreenTests(TestCase):
         user = get_user_model().objects.create_user(username='limited_staff', is_staff=True)
         self.client.force_login(user)
         self.assertEqual(self.client.get(reverse('devices')).status_code, 403)
+
+
+class WeeklyGraphTests(TestCase):
+    def setUp(self):
+        self.location = LocationMaster.objects.create(name='曜日検証', capacity=40)
+        self.today = timezone.localdate()
+
+    def record(self, count, day, location=None):
+        from datetime import time
+        return CrowdLog.objects.create(location=location or self.location, user_count=count,
+            recorded_at=timezone.make_aware(datetime.combine(day, time(12))))
+
+    def test_average_zero_missing_and_no_database_writes(self):
+        from datetime import timedelta
+        self.record(0, self.today)
+        self.record(10, self.today - timedelta(days=1))
+        self.record(30, self.today - timedelta(days=1))
+        before = list(CrowdLog.objects.values())
+        response = self.client.get(reverse('weekly'))
+        chart = response.context['chart']
+        self.assertEqual(chart[self.today.weekday()]['average'], 0)
+        self.assertEqual(chart[(self.today.weekday() - 1) % 7]['average'], 20)
+        self.assertEqual(sum(row['measured'] for row in chart), 2)
+        self.assertContains(response, '未計測')
+        self.assertContains(response, '0人')
+        self.assertContains(response, '<details>')
+        self.assertNotContains(response, '<details open')
+        self.assertContains(response, f'href="/prediction-graph/?location={self.location.pk}"')
+        self.assertEqual(list(CrowdLog.objects.values()), before)
+
+    def test_period_boundaries_and_location(self):
+        from datetime import timedelta
+        self.record(10, self.today - timedelta(days=27))
+        self.record(99, self.today - timedelta(days=28))
+        self.record(99, self.today + timedelta(days=1))
+        other = LocationMaster.objects.create(name='対象外', capacity=40)
+        self.record(99, self.today, other)
+        self.assertEqual(self.client.get(reverse('weekly')).context['samples'], 1)
+        self.assertEqual(self.client.get(reverse('weekly'), {'period': 56}).context['samples'], 2)
+        self.assertEqual(self.client.get(reverse('weekly'), {'location': other.pk}).context['samples'], 1)
+
+    def test_japan_midnight_and_invalid_parameters(self):
+        # UTC Sunday 15:00 is Monday 00:00 in Japan.
+        from datetime import timedelta
+        monday = self.today - timedelta(days=self.today.weekday())
+        at = timezone.make_aware(datetime.combine(monday, datetime.min.time()))
+        CrowdLog.objects.create(location=self.location, user_count=5,
+                                recorded_at=at.astimezone(datetime_timezone.utc))
+        response = self.client.get(reverse('weekly'), {'location': 'bad', 'period': 'bad'})
+        self.assertEqual(response.context['chart'][0]['average'], 5)
+        self.assertTrue(response.context['invalid_period'])
+        self.assertTrue(response.context['invalid_location'])
+
+    def test_no_locations_and_no_measurements(self):
+        response = self.client.get(reverse('weekly'))
+        self.assertEqual(response.context['samples'], 0)
+        self.assertTrue(all(row['average'] is None for row in response.context['chart']))
+        self.location.delete()
+        self.assertContains(self.client.get(reverse('weekly')), '場所が未登録です')
+
+
+class PredictionGraphTests(TestCase):
+    def setUp(self):
+        self.location = LocationMaster.objects.create(name='予測検証', capacity=40)
+        self.other = LocationMaster.objects.create(name='対象外', capacity=40)
+        self.now = datetime(2026, 10, 7, 3, tzinfo=datetime_timezone.utc)  # Japan 12:00
+        self.clock = patch('crowd_app.views.timezone.now', return_value=self.now)
+        self.clock.start()
+        self.addCleanup(self.clock.stop)
+
+    def forecast(self, count, delta, location=None):
+        return CrowdPrediction.objects.create(location=location or self.location,
+            expected_count=count, predicted_at=self.now + timedelta(hours=delta))
+
+    def test_empty_state_does_not_use_actuals_as_forecast(self):
+        CrowdLog.objects.create(location=self.location, user_count=12, recorded_at=self.now)
+        response = self.client.get(reverse('prediction'))
+        self.assertContains(response, '予測データがありません')
+        self.assertEqual(response.context['predictions'], [])
+        self.assertEqual(len(response.context['actuals']), 1)
+        self.assertEqual(response.context['forecast_path'], '')
+        self.assertNotEqual(response.context['actual_path'], '')
+
+    def test_only_selected_future_today_and_zero(self):
+        zero = self.forecast(0, 1)
+        later = self.forecast(65, 2)
+        self.forecast(7, -1)
+        self.forecast(8, 0)
+        self.forecast(9, 12)  # Japan next day midnight, excluded
+        self.forecast(10, 1, self.other)
+        response = self.client.get(reverse('prediction'))
+        self.assertEqual(response.context['predictions'], [zero, later])
+        self.assertContains(response, '0人')
+        self.assertContains(response, '作成日時：未記録')
+        self.assertEqual(response.context['peak'], later)
+        self.assertGreaterEqual(response.context['y_ticks'][0], 65)
+
+    def test_duplicate_target_and_invalid_count(self):
+        self.forecast(20, 1)
+        chosen = self.forecast(25, 1)
+        self.forecast(-4, 2)
+        response = self.client.get(reverse('prediction'))
+        self.assertEqual(response.context['predictions'], [chosen])
+        self.assertEqual(response.context['invalid_predictions'], 1)
+        self.assertContains(response, '負の予測データ1件')
+
+    def test_location_navigation_and_no_mutation(self):
+        forecast = self.forecast(6, 1, self.other)
+        before = list(CrowdPrediction.objects.values())
+        response = self.client.get(reverse('prediction'), {'location': self.other.pk})
+        self.assertEqual(response.context['predictions'], [forecast])
+        self.assertContains(response, f'href="/weekly-graph/?location={self.other.pk}"')
+        self.assertContains(response, f'href="/?location={self.other.pk}"')
+        self.assertEqual(list(CrowdPrediction.objects.values()), before)
+        self.assertFalse(CrowdLog.objects.exists())
+        self.assertIn('no-store', response['Cache-Control'])
+        home = self.client.get(reverse('home'), {'location': self.other.pk})
+        self.assertContains(home, f'href="/prediction-graph/?location={self.other.pk}"')
+        weekly = self.client.get(reverse('weekly'), {'location': self.other.pk})
+        self.assertContains(weekly, f'href="/prediction-graph/?location={self.other.pk}"')
+
+    def test_invalid_location_and_no_locations(self):
+        response = self.client.get(reverse('prediction'), {'location': 'bad'})
+        self.assertTrue(response.context['invalid_location'])
+        self.assertEqual(response.context['selected_location'], self.location)
+        LocationMaster.objects.all().delete()
+        self.assertContains(self.client.get(reverse('prediction')), '場所が未登録です')
+
+    def test_actuals_are_today_and_not_future(self):
+        for hours in (-13, -1, 1):
+            CrowdLog.objects.create(location=self.location, user_count=4,
+                                    recorded_at=self.now + timedelta(hours=hours))
+        response = self.client.get(reverse('prediction'))
+        self.assertEqual(len(response.context['actuals']), 1)
+        self.assertContains(response, '実績（計測済み）')
 
 
 class CameraRecordingIntegrationTests(TestCase):
