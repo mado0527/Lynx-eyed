@@ -91,7 +91,7 @@ class HomeTests(TestCase):
         response = self.client.get(reverse('home'))
         self.assertContains(response, '場所が未登録です')
         self.assertContains(response, '未計測')
-        self.assertContains(response, 'href="/admin/"')
+        self.assertContains(response, 'href="/management/"')
 
     def test_unmeasured_is_distinct_from_zero(self):
         location = self.make_location()
@@ -252,10 +252,11 @@ class MockupScreenTests(TestCase):
         self.assertContains(self.client.get('/'), 'type="submit"', count=1)
 
     def test_authentication_and_admin_templates(self):
-        self.assertRedirects(self.client.get('/login/'), '/admin/login/')
+        self.assertRedirects(self.client.get('/login/'), '/management/login/')
         response = self.client.get('/admin/login/')
         self.assertContains(response, 'csrfmiddlewaretoken')
-        self.assertContains(response, 'admin-design.css')
+        self.assertContains(response, 'crowd_app/management.css')
+        self.assertTemplateUsed(response, 'crowd_app/management_login.html')
         response = self.client.get(reverse('devices'))
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response['Location'].startswith('/admin/login/'))

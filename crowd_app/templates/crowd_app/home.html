@@ -62,7 +62,7 @@
       <a href="{% url 'prediction' %}{% if selected_location %}?location={{ selected_location.pk }}{% endif %}" class="action primary"><span aria-hidden="true">↗</span><span class="action-text">混雑予測グラフを見る</span></a>
       <a href="{% url 'live' %}" class="action"><span aria-hidden="true">▣</span><span class="action-text">ライブ映像を見る<small>未実装</small></span></a>
       <a href="{% url 'help' %}" class="action"><span aria-hidden="true">ⓘ</span>ヘルプ</a>
-      <a href="{% url 'admin:index' %}" class="action admin-action"><span aria-hidden="true">⚙</span>管理者ページ</a>
+      <a href="{% url 'management' %}{% if selected_location %}?location={{ selected_location.pk }}{% endif %}" class="action admin-action"><span aria-hidden="true">⚙</span>管理者ページ</a>
     </nav>
   </main>
 <script src="{% static 'crowd_app/graph_tooltips.js' %}?v=20261008-2" defer></script>

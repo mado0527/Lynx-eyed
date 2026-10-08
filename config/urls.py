@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from crowd_app.views import home, information_page, device_management, weekly_graph, prediction_graph
 from django.views.generic import RedirectView
+from crowd_app.management import dashboard, ManagementLoginView, ManagementLogoutView, DataManagementLoginView, DataManagementLogoutView
 
 urlpatterns = [
     path('', home, name='home'),
@@ -26,6 +27,11 @@ urlpatterns = [
     path('live/', information_page, {'page': 'live'}, name='live'),
     path('help/', information_page, {'page': 'help'}, name='help'),
     path('device-management/', device_management, name='devices'),
-    path('login/', RedirectView.as_view(pattern_name='admin:login', permanent=False)),
+    path('management/login/', ManagementLoginView.as_view(), name='management_login'),
+    path('management/logout/', ManagementLogoutView.as_view(), name='management_logout'),
+    path('management/', dashboard, name='management'),
+    path('login/', RedirectView.as_view(pattern_name='management_login', permanent=False, query_string=True)),
+    path('admin/login/', DataManagementLoginView.as_view()),
+    path('admin/logout/', DataManagementLogoutView.as_view()),
     path('admin/', admin.site.urls),
 ]

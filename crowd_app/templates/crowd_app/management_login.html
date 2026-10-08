@@ -1,0 +1,9 @@
+{% load static %}
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>管理者ログイン | Lynx-eyed</title><link rel="stylesheet" href="{% static 'crowd_app/management.css' %}?v=20261008-1"></head>
+<body class="login-page"><main class="login-card"><div class="login-heading"><div class="login-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/></svg></div><h1>管理者ログイン</h1><p>認証が必要です</p></div>
+<form method="post">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}"><input type="hidden" name="location" value="{{ location_id }}">
+{% if form.non_field_errors %}<div class="login-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+<div class="login-field"><label for="{{ form.username.id_for_label }}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M5 21v-3a7 7 0 0 1 14 0v3"/></svg>ユーザー名</label>{{ form.username }}{{ form.username.errors }}</div>
+<div class="login-field"><label for="{{ form.password.id_for_label }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/></svg>パスワード</label>{{ form.password }}{{ form.password.errors }}</div>
+<button class="primary-button login-submit" type="submit">ログイン</button></form>
+<a class="login-back" href="{% url 'home' %}">←&nbsp; トップへ戻る</a></main></body></html>

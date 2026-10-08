@@ -182,7 +182,21 @@ def device_management(request):
     can_view_cameras = request.user.has_perm('crowd_app.view_camerainfo')
     if not (can_view_devices or can_view_cameras):
         raise PermissionDenied
+    selected = None
+    if 'location' in request.GET:
+        if not request.user.has_perm('crowd_app.view_locationmaster'):
+            raise PermissionDenied
+        selected = next((row for row in LocationMaster.objects.order_by('location_id')
+                         if str(row.pk) == request.GET['location']), None)
+        if selected is None:
+            raise PermissionDenied
+    cameras = CameraInfo.objects.select_related('location', 'device').order_by('camera_id') if can_view_cameras else CameraInfo.objects.none()
+    if selected:
+        cameras = cameras.filter(location=selected)
     return render(request, 'crowd_app/devices.html', {
+        'can_view_devices': can_view_devices, 'can_view_cameras': can_view_cameras,
+        'selected_location': selected,
+        'can_access_dashboard': request.user.has_perms(('crowd_app.view_locationmaster', 'crowd_app.view_crowdlog')),
         'devices': DeviceInfo.objects.order_by('device_id') if can_view_devices else DeviceInfo.objects.none(),
-        'cameras': CameraInfo.objects.select_related('location', 'device').order_by('camera_id') if can_view_cameras else CameraInfo.objects.none(),
+        'cameras': cameras,
     })
