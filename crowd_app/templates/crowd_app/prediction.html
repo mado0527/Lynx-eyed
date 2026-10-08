@@ -1,5 +1,5 @@
 {% load static l10n %}
-<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>混雑予測グラフ | Lynx-eyed</title><link rel="stylesheet" href="{% static 'crowd_app/weekly.css' %}"><link rel="stylesheet" href="{% static 'crowd_app/prediction.css' %}"></head>
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>混雑予測グラフ | Lynx-eyed</title><link rel="stylesheet" href="{% static 'crowd_app/weekly.css' %}?v=20261008-2"><link rel="stylesheet" href="{% static 'crowd_app/prediction.css' %}?v=20261008-2"></head>
 <body><main class="weekly-page prediction-page">
 <header><a class="back" href="{% url 'home' %}{% if selected_location %}?location={{ selected_location.pk }}{% endif %}" aria-label="トップへ戻る"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7"/></svg></a><div><h1>混雑予測グラフ</h1><p>本日の予測データ</p></div><span class="header-spacer" aria-hidden="true"></span></header>
 {% if invalid_location %}<p class="notice">指定された場所が見つかりません。登録済みの場所を表示しています。</p>{% endif %}
@@ -8,8 +8,8 @@
 <div class="grid" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
 {% localize off %}{% for tick in ticks %}<div class="time-grid" style="left:{{ tick.left }}%" aria-hidden="true"></div>{% endfor %}
 <svg class="forecast-lines" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true"><path class="actual-line" d="{{ actual_path }}"/><path class="forecast-line" d="{{ forecast_path }}"/></svg>
-{% for point in actual_points %}<span class="chart-dot actual-dot {{ point.edge }}" style="left:{{ point.left }}%;top:{{ point.top }}%" tabindex="0" aria-label="実績 {{ point.at|date:'H:i:s' }} {{ point.count }}人"><span class="tooltip">実績 {{ point.at|date:'H:i:s' }}・{{ point.count }}人</span></span>{% endfor %}
-{% for point in forecast_points %}<span class="chart-dot forecast-dot {{ point.edge }}" style="left:{{ point.left }}%;top:{{ point.top }}%" tabindex="0" aria-label="予測対象 {{ point.at|date:'H:i:s' }} {{ point.count }}人、作成日時は未記録"><span class="tooltip">予測対象 {{ point.at|date:'H:i:s' }}・{{ point.count }}人<br>作成日時：未記録</span></span>{% endfor %}
+{% for point in actual_points %}<span class="chart-dot actual-dot {{ point.edge }}" style="left:{{ point.left }}%;top:{{ point.top }}%" tabindex="0" aria-label="実績 {{ point.at|date:'H:i:s' }} {{ point.count }}人"><span class="tooltip"><span class="tooltip-heading">{{ point.at|date:'H:i' }}</span><span class="tooltip-value">実績：{{ point.count }}人</span></span></span>{% endfor %}
+{% for point in forecast_points %}<span class="chart-dot forecast-dot {{ point.edge }}" style="left:{{ point.left }}%;top:{{ point.top }}%" tabindex="0" aria-label="予測対象 {{ point.at|date:'H:i:s' }} {{ point.count }}人、作成日時は未記録"><span class="tooltip"><span class="tooltip-heading">{{ point.at|date:'H:i' }}</span><span class="tooltip-value">予測：{{ point.count }}人</span><small>作成日時：未記録</small></span></span>{% endfor %}
 {% for tick in ticks %}<span class="time-label {% if not tick.compact %}wide-label{% endif %}" style="left:{{ tick.left }}%">{{ tick.label }}</span>{% endfor %}{% endlocalize %}
 {% if not predictions %}<p class="no-forecast" role="status">予測データがありません</p>{% endif %}
 </div></div>
@@ -19,4 +19,4 @@
 <div class="table-scroll"><table><caption>実績（計測済み）</caption><thead><tr><th>計測日時</th><th>実測人数</th></tr></thead><tbody>{% for row in actuals %}<tr><td>{{ row.recorded_at|date:'Y/m/d H:i:s' }}</td><td>{{ row.user_count }}人</td></tr>{% empty %}<tr><td colspan="2">本日の実測記録はありません</td></tr>{% endfor %}</tbody></table></div></details></section>
 <aside class="info-card"><h2 class="badge">予測のポイント</h2><ul>{% if peak %}<li>保存済み予測の最大値は{{ peak.predicted_at|date:'H:i' }}の{{ peak.expected_count }}人です。</li><li>本日の未来の予測{{ predictions|length }}件を表示しています。</li><li>予測の生成方法・精度は未確認です。</li>{% else %}<li>予測データがありません。</li><li>予測値を生成する処理は未実装です。</li><li>実測記録を予測値として表示することはありません。</li>{% endif %}</ul></aside>
 <a class="home-button" href="{% url 'weekly' %}{% if selected_location %}?location={{ selected_location.pk }}{% endif %}">曜日ごとのグラフを表示</a>
-</main></body></html>
+</main><script src="{% static 'crowd_app/graph_tooltips.js' %}?v=20261008-2" defer></script></body></html>
