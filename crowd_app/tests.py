@@ -282,6 +282,23 @@ class WeeklyGraphTests(TestCase):
         return CrowdLog.objects.create(location=location or self.location, user_count=count,
             recorded_at=timezone.make_aware(datetime.combine(day, time(12))))
 
+    def test_saved_summary_mapping_latest_month_and_no_writes(self):
+        from .models import DayOfWeekSummaryLog
+        month = timezone.make_aware(datetime.combine(self.today.replace(day=1), datetime.min.time()))
+        for day, average in [(0, 4), (1, 7), (1, 13)]:
+            DayOfWeekSummaryLog.objects.create(location=self.location, summary_month=month,
+                day_of_week=day, avg_count=average, executed_at=timezone.now())
+        DayOfWeekSummaryLog.objects.create(location=self.location, summary_month=month-timedelta(days=1),
+            day_of_week=2, avg_count=99, executed_at=timezone.now())
+        before = list(DayOfWeekSummaryLog.objects.values())
+        response = self.client.get(reverse('weekly'))
+        self.assertTrue(response.context['saved_summary'])
+        self.assertEqual(response.context['chart'][0]['average'], 13)
+        self.assertEqual(response.context['chart'][6]['average'], 4)
+        self.assertIsNone(response.context['chart'][1]['average'])
+        self.assertContains(response, '保存済み曜日別集計')
+        self.assertEqual(list(DayOfWeekSummaryLog.objects.values()), before)
+
     def test_average_zero_missing_and_no_database_writes(self):
         from datetime import timedelta
         self.record(0, self.today)

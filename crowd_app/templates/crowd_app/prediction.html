@@ -4,8 +4,6 @@
 <header><a class="back" href="{% url 'home' %}{% if selected_location %}?location={{ selected_location.pk }}{% endif %}" aria-label="トップへ戻る"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7"/></svg></a><div><h1>混雑予測グラフ</h1><p>本日の予測データ</p></div><span class="header-spacer" aria-hidden="true"></span></header>
 {% if invalid_location %}<p class="notice">指定された場所が見つかりません。登録済みの場所を表示しています。</p>{% endif %}
 <section class="graph-card" aria-labelledby="prediction-title"><h2 class="badge" id="prediction-title">時間帯別の混雑予測</h2>
-<p class="forecast-caption">{% if selected_location %}{{ selected_location.name }}{% else %}場所が未登録です{% endif %}・{{ today|date:'Y/m/d' }}（日本時間）</p>
-<div class="legend"><span class="forecast-key">予測（保存済み）</span><span class="actual-key">実績（計測済み）</span></div>
 <div class="chart"><div class="scale" aria-hidden="true">{% for tick in y_ticks %}<span>{{ tick }}</span>{% endfor %}</div><div class="plot">
 <div class="grid" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
 {% localize off %}{% for tick in ticks %}<div class="time-grid" style="left:{{ tick.left }}%" aria-hidden="true"></div>{% endfor %}

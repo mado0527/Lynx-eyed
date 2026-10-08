@@ -4,7 +4,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import PermissionDenied
 from .calculations import calculate_crowd_rate
 
-from .models import CrowdLog, CrowdPrediction, LocationMaster, DeviceInfo, CameraInfo
+from .models import CrowdLog, CrowdPrediction, LocationMaster, DeviceInfo, CameraInfo, DayOfWeekSummaryLog
 from .prediction_chart import chart_series
 from datetime import datetime, time, timedelta
 from django.utils import timezone
@@ -77,11 +77,23 @@ def weekly_graph(request):
     start = timezone.make_aware(datetime.combine(start_date, time.min), zone)
     end = timezone.make_aware(datetime.combine(today + timedelta(days=1), time.min), zone)
     aggregates = {}
+    saved_summary = False
     if selected:
-        rows = (CrowdLog.objects.filter(location=selected, recorded_at__gte=start, recorded_at__lt=end)
-                .annotate(weekday=ExtractIsoWeekDay('recorded_at', tzinfo=zone))
-                .values('weekday').annotate(average=Avg('user_count'), samples=Count('pk')))
-        aggregates = {row['weekday']: row for row in rows}
+        month_start = timezone.make_aware(datetime.combine(today.replace(day=1), time.min), zone)
+        next_month = (today.replace(day=28) + timedelta(days=4)).replace(day=1)
+        month_end = timezone.make_aware(datetime.combine(next_month, time.min), zone)
+        summaries = DayOfWeekSummaryLog.objects.filter(
+            location=selected, summary_month__gte=month_start, summary_month__lt=month_end,
+            day_of_week__range=(0, 6), avg_count__gte=0,
+        ).order_by('executed_at', 'dow_log_id')
+        for row in summaries:
+            aggregates[row.day_of_week or 7] = {'average': row.avg_count, 'samples': 1}
+        saved_summary = bool(aggregates)
+        if not saved_summary:
+            rows = (CrowdLog.objects.filter(location=selected, recorded_at__gte=start, recorded_at__lt=end)
+                    .annotate(weekday=ExtractIsoWeekDay('recorded_at', tzinfo=zone))
+                    .values('weekday').annotate(average=Avg('user_count'), samples=Count('pk')))
+            aggregates = {row['weekday']: row for row in rows}
     maximum = max((row['average'] for row in aggregates.values()), default=0)
     step = max(1, math.ceil(maximum / 4))
     ceiling = step * 4
@@ -100,6 +112,7 @@ def weekly_graph(request):
         'ticks': [step * index for index in range(4, -1, -1)],
         'samples': sum(row['samples'] for row in measured), 'busiest': busiest,
         'maximum': maximum, 'invalid_location': invalid_location, 'invalid_period': invalid_period,
+        'saved_summary': saved_summary, 'summary_month': today.replace(day=1),
     })
 
 
