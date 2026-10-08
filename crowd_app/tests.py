@@ -312,8 +312,10 @@ class WeeklyGraphTests(TestCase):
         self.assertEqual(sum(row['measured'] for row in chart), 2)
         self.assertContains(response, '未計測')
         self.assertContains(response, '0人')
-        self.assertContains(response, '<details>')
-        self.assertNotContains(response, '<details open')
+        self.assertNotContains(response, '<details')
+        self.assertContains(response, 'class="column"', count=7)
+        self.assertNotContains(response, '<<<<<<<')
+        self.assertNotContains(response, '>>>>>>>')
         self.assertContains(response, f'href="/prediction-graph/?location={self.location.pk}"')
         self.assertEqual(list(CrowdLog.objects.values()), before)
 
@@ -345,7 +347,7 @@ class WeeklyGraphTests(TestCase):
         self.assertEqual(response.context['samples'], 0)
         self.assertTrue(all(row['average'] is None for row in response.context['chart']))
         self.location.delete()
-        self.assertContains(self.client.get(reverse('weekly')), '場所が未登録です')
+        self.assertIsNone(self.client.get(reverse('weekly')).context['selected_location'])
 
 
 class PredictionGraphTests(TestCase):
@@ -413,7 +415,7 @@ class PredictionGraphTests(TestCase):
         self.assertTrue(response.context['invalid_location'])
         self.assertEqual(response.context['selected_location'], self.location)
         LocationMaster.objects.all().delete()
-        self.assertContains(self.client.get(reverse('prediction')), '場所が未登録です')
+        self.assertIsNone(self.client.get(reverse('prediction')).context['selected_location'])
 
     def test_actuals_are_today_and_not_future(self):
         for hours in (-13, -1, 1):
@@ -421,7 +423,8 @@ class PredictionGraphTests(TestCase):
                                     recorded_at=self.now + timedelta(hours=hours))
         response = self.client.get(reverse('prediction'))
         self.assertEqual(len(response.context['actuals']), 1)
-        self.assertContains(response, '実績（計測済み）')
+        self.assertContains(response, 'chart-dot actual-dot', count=1)
+        self.assertNotContains(response, '<details')
 
 
 class CameraRecordingIntegrationTests(TestCase):

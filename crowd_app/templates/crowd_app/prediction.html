@@ -14,9 +14,7 @@
 {% if not predictions %}<p class="no-forecast" role="status">予測データがありません</p>{% endif %}
 </div></div>
 {% if invalid_predictions %}<p class="notice">人数が負の予測データ{{ invalid_predictions }}件は表示対象から除外しています。</p>{% endif %}
-<details><summary>予測対象日時・作成日時・データ一覧</summary><p>本日のうち、現在（{{ now|date:'H:i:s' }}）より未来の保存済み予測だけを青で表示します。灰色の破線と点は本日の実測記録です。予測と実績は接続しません。同じ予測対象日時が重複する場合は最大IDの記録を表示します。</p><p>予測対象日時はCrowdPrediction.predicted_atです。予測の作成日時・生成方法は既存モデルに保存されていないため不明です。この画面は予測を生成しません。点は保存された値、曲線は点を結ぶ表示上の補間です。</p>
-<div class="table-scroll"><table><caption>予測（保存済み）</caption><thead><tr><th>予測対象日時</th><th>予測人数</th><th>作成日時</th></tr></thead><tbody>{% for row in predictions %}<tr><td>{{ row.predicted_at|date:'Y/m/d H:i:s' }}</td><td>{{ row.expected_count }}人</td><td>未記録</td></tr>{% empty %}<tr><td colspan="3">予測データがありません</td></tr>{% endfor %}</tbody></table></div>
-<div class="table-scroll"><table><caption>実績（計測済み）</caption><thead><tr><th>計測日時</th><th>実測人数</th></tr></thead><tbody>{% for row in actuals %}<tr><td>{{ row.recorded_at|date:'Y/m/d H:i:s' }}</td><td>{{ row.user_count }}人</td></tr>{% empty %}<tr><td colspan="2">本日の実測記録はありません</td></tr>{% endfor %}</tbody></table></div></details></section>
+</section>
 <aside class="info-card"><h2 class="badge">予測のポイント</h2><ul>{% if peak %}<li>保存済み予測の最大値は{{ peak.predicted_at|date:'H:i' }}の{{ peak.expected_count }}人です。</li><li>本日の未来の予測{{ predictions|length }}件を表示しています。</li><li>予測の生成方法・精度は未確認です。</li>{% else %}<li>予測データがありません。</li><li>予測値を生成する処理は未実装です。</li><li>実測記録を予測値として表示することはありません。</li>{% endif %}</ul></aside>
 <a class="home-button" href="{% url 'weekly' %}{% if selected_location %}?location={{ selected_location.pk }}{% endif %}">曜日ごとのグラフを表示</a>
 </main><script src="{% static 'crowd_app/graph_tooltips.js' %}?v=20261008-2" defer></script></body></html>
