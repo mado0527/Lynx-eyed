@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {% if refresh_seconds %}<meta http-equiv="refresh" content="{{ refresh_seconds }}">{% endif %}
   <title>Lynx-eyed | 現在の混雑状況</title>
-  <link rel="stylesheet" href="{% static 'crowd_app/home.css' %}">
+  <link rel="stylesheet" href="{% static 'crowd_app/home.css' %}?v=20261008-2">
 </head>
 <body>
   <main class="container">
@@ -39,17 +39,20 @@
         <h2 id="trend-heading"><span class="clock-icon" aria-hidden="true">↗</span>利用人数の推移</h2>
         {% if history %}
         <p class="chart-caption">直近{{ history|length }}件の計測記録・日本時間</p>
-        <svg class="trend-chart" viewBox="0 0 680 300" role="img" aria-labelledby="chart-title chart-description">
+        <div class="trend-tooltip-plot"><svg class="trend-chart" viewBox="0 0 680 300" role="group" aria-labelledby="chart-title chart-description">
           <title id="chart-title">利用人数の推移</title><desc id="chart-description">横軸は計測日時、縦軸は利用人数です。各棒の詳細は下の計測記録一覧で確認できます。</desc>
           <text x="12" y="24" class="axis-label">利用人数（人）</text>
           {% for tick in chart_ticks %}<line x1="60" x2="620" y1="{{ tick.y }}" y2="{{ tick.y }}" class="grid-line"/><text x="48" y="{{ tick.y|add:5 }}" text-anchor="end" class="axis-label">{{ tick.value }}</text>{% endfor %}
           {% localize off %}{% for point in chart_points %}
-          <rect x="{{ point.left }}" y="{{ point.y }}" width="{{ point.width }}" height="{{ point.height }}" rx="5" class="trend-bar"><title>{% timezone "Asia/Tokyo" %}{{ point.record.recorded_at|date:'Y/m/d H:i:s' }}{% endtimezone %} / {{ point.record.user_count }}人</title></rect>
+          <g class="column" tabindex="0" aria-label="計測 {% timezone 'Asia/Tokyo' %}{{ point.record.recorded_at|date:'Y/m/d H:i:s' }}{% endtimezone %} {{ point.record.user_count }}人" data-tooltip-heading="{% timezone 'Asia/Tokyo' %}{{ point.record.recorded_at|date:'m/d H:i:s' }}{% endtimezone %}" data-tooltip-value="利用人数：{{ point.record.user_count }}人">
+          <rect fill="transparent" class="trend-slot" x="{{ point.slot_left }}" y="50" width="{{ point.slot_width }}" height="190"/>
+          <rect x="{{ point.left }}" y="{{ point.y }}" width="{{ point.width }}" height="{{ point.height }}" rx="5" class="trend-bar"/>
+          </g>
           {% if point.record.user_count == 0 %}<text x="{{ point.x }}" y="230" text-anchor="middle" class="axis-label">0人</text>{% endif %}
           {% if point.show_label %}{% timezone "Asia/Tokyo" %}<text x="{{ point.x }}" y="262" text-anchor="middle" class="axis-label"><tspan x="{{ point.x }}">{{ point.record.recorded_at|date:'m/d' }}</tspan><tspan x="{{ point.x }}" dy="15">{{ point.record.recorded_at|date:'H:i:s' }}</tspan></text>{% endtimezone %}{% endif %}
           {% endfor %}{% endlocalize %}
           <text x="340" y="294" text-anchor="middle" class="axis-label">計測日時（日本時間）</text>
-        </svg>
+        </svg></div>
         <details class="record-details"><summary>計測記録一覧</summary><div class="table-scroll"><table><thead><tr><th scope="col">計測日時（日本時間）</th><th scope="col">利用人数</th></tr></thead><tbody>{% for record in history %}<tr><td>{% timezone "Asia/Tokyo" %}{{ record.recorded_at|date:'Y/m/d H:i:s' }}{% endtimezone %}</td><td>{{ record.user_count }}人</td></tr>{% endfor %}</tbody></table></div></details>
         {% else %}<p class="no-measurement">対象期間のデータが存在しません</p><p class="chart-caption">表示対象：選択した場所の直近20件の計測記録</p>{% endif %}
       </section>
@@ -62,5 +65,6 @@
       <a href="{% url 'admin:index' %}" class="action admin-action"><span aria-hidden="true">⚙</span>管理者ページ</a>
     </nav>
   </main>
+<script src="{% static 'crowd_app/graph_tooltips.js' %}?v=20261008-2" defer></script>
 </body>
 </html>

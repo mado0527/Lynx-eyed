@@ -136,6 +136,7 @@ def home(request):
                 y = 240 - 190 * row.user_count / max_count
                 points.append({
                     'x': round(x, 2), 'left': round(x - bar_width / 2, 2),
+                    'slot_left': round(60 + slot_width * index, 2), 'slot_width': round(slot_width, 2),
                     'width': round(bar_width, 2), 'y': round(y, 2),
                     'height': round(240 - y, 2), 'record': row,
                     'show_label': len(history) <= 5 or index in (0, len(history) - 1),
