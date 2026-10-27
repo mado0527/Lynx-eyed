@@ -19,9 +19,7 @@
       {% if not selected_location %}<div><h2>場所が未登録です</h2></div>{% endif %}
       <form id="location-form" action="{% url 'home' %}" method="get" class="controls">
         {% if refresh_seconds %}<input type="hidden" name="realtime" value="1">{% endif %}
-        {% if locations|length > 1 %}
-        <div class="select-field"><label for="location">表示する場所</label><select id="location" name="location">{% for location in locations %}<option value="{{ location.pk }}"{% if location.pk == selected_location.pk %} selected{% endif %}>{{ location.name }}</option>{% endfor %}</select></div>
-        {% elif selected_location %}<input type="hidden" name="location" value="{{ selected_location.pk }}">{% endif %}
+        {% if selected_location %}<input type="hidden" name="location" value="{{ selected_location.pk }}">{% endif %}
       </form>
     </section>
     <div class="status-grid">
