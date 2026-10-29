@@ -84,7 +84,11 @@ cd C:\Users\user\Documents\GitHub\Lynx-eyed
 ## 7. マスクを使ってDB保存する
 
 ```powershell
+<<<<<<< HEAD
 .\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --mask-config .camera-runtime\masks\232-v1.json --save-db --location-id 1
+=======
+.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --mask-config .camera-runtime\masks\223-v1.json --save-db --location-id 1
+>>>>>>> 5c8f5deb4ccd6d42a6eaffec732bfdc0787eb746
 ```
 
 場所IDとマスク設定ファイルは事前に確認してください。
