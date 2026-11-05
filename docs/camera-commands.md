@@ -36,6 +36,39 @@ Test-Path .camera-runtime\masks\232-v1.json
 範囲を変更する場合は `--select-mask .camera-runtime\masks\232-v2.json` など新しい名前で作成し、以降の `--mask-config` も同じ名前に変更します。
 **カメラの向きや解像度が変わった場合も、範囲を設定し直してください。**
 
+### 保存済みの黒塗り範囲だけを消す
+
+実行中のカメラを **Ctrl+C** で停止し、PowerShellで次を実行します。
+`$path` には、現在 `--mask-config` で指定しているファイルを設定してください。
+
+```powershell
+$path = '.camera-runtime\masks\232-v1.json'
+$mask = Get-Content -LiteralPath $path -Raw -Encoding utf8 | ConvertFrom-Json
+$mask.rectangles = @()
+$mask | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $path -Encoding utf8
+```
+
+保存済みの黒塗り範囲をすべて消し、同じファイルへ上書きします。解像度設定とDBデータは変更しません。
+このリセット操作は、毎回同じファイルへ上書きして使えます。設定を残したい場合は、先にファイルをコピーしておいてください。
+その後、同じ `--mask-config` の起動コマンドでカメラを起動し直すと、黒塗り範囲がない状態で動作します。
+
+### 黒塗り範囲を選び直す
+
+`--select-mask` は既存ファイルへ上書きできません。範囲をリセットしてもファイル自体は残るため、新しい名前で作成します。
+
+```powershell
+.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --select-mask .camera-runtime\masks\232-v2.json
+```
+
+範囲を選択して **S** で保存したら、通常運用の起動コマンドも新しいファイル名に変更します。
+以下は教室232の場所IDが1の場合です。
+
+```powershell
+.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --mask-config .camera-runtime\masks\232-v2.json --save-db --location-id 1
+```
+
+すでに `232-v2.json` がある場合は、`232-v3.json` など未使用の名前にしてください。
+
 ## 2. 通常運用：マスク付きでDB保存する
 
 教室232の場所IDが **1の場合**のコマンドです。教室名232と場所IDは別です。
