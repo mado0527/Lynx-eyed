@@ -228,8 +228,8 @@ def run(args):
                     logging.info('Inference OK: persons=%d (%s)', count, 'DB saved' if recorder else 'not saved')
                     last_log = time.monotonic()
             else:
-                preview = frame.copy()
-                text = f'Last measured: {count} | Waiting for next measurement | {status}'
+                preview = apply_mask(frame, mask)
+                text = f'Last measured: {count} | Waiting for next measurement | {mask_label} | {status}'
             if not compare:
                 cv2.rectangle(preview, (0, 0), (preview.shape[1], 42), (25, 25, 25), -1)
                 cv2.putText(preview, text, (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)

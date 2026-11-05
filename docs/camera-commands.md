@@ -1,116 +1,114 @@
-# カメラ起動コマンド一覧（Windows PowerShell）
+# 教室232：カメラ起動コマンド（Windows PowerShell）
 
-VS Codeでプロジェクトのフォルダーを開き、PowerShellから実行します。
-以下は現在の配信URL `http://192.168.0.151:8080/?action=stream` を使用する例です。
-PCからカメラへ接続できるネットワークで実行してください。
+現在の配信URL：`http://192.168.0.151:8080/?action=stream`
+
+プロジェクトのフォルダーから実行します。PCからカメラへ接続できるネットワークを使用してください。
 
 ```powershell
 cd C:\Users\user\Documents\GitHub\Lynx-eyed
 ```
 
-`.venv` の有効化は省略できます。以下では仮想環境のPythonを直接指定しています。
-接続待ちは `--timeout 30` で30秒に設定しています。
+`.venv` が有効でも無効でも、以下のPython指定で実行できます。
+**通常運用は「2. マスク付きでDB保存する」です。** マスクが作成済みなら、毎回作り直す必要はありません。
+同じカメラの処理を重ねて起動せず、切り替えるときは先に実行中の処理を停止してください。
 
-## 1. 映像だけ確認する（DB保存なし）
+## 1. 初回のみ：マスクを作成する
 
-```powershell
-.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --capture-only
-```
-
-`Frame acquired: 1280x720` などが表示されれば映像取得成功です。人数検知は行いません。
-
-## 2. 映像と人数検知を表示する（DB保存なし）
+`232-v1.json` がまだない場合に実行します。この操作は範囲の設定だけで、DBには保存しません。
 
 ```powershell
-.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30
+.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --select-mask .camera-runtime\masks\232-v1.json
 ```
 
-## 3. 人数検知してDBに保存する
+1. 検知から除外する領域をマウスでドラッグします。人を検知したい範囲は隠さないでください。
+2. **Enter / Space** で領域を確定します。必要なら別の領域を追加します。
+3. **Esc** で領域選択を終えます。
+4. 黒塗りされた確認ウィンドウをクリックし、**S** を押して保存します。
+5. `Mask configuration saved` が出れば作成完了です。Ctrl+Cや確認画面のEsc / Qは保存せず終了します。
 
-まず場所IDを確認します。場所名「223」と場所IDは別です。PCや接続先DBによってIDが異なる場合があります。
+設定の存在確認：
+
+```powershell
+Test-Path .camera-runtime\masks\232-v1.json
+```
+
+`True` ならファイルがあります。`Mask file already exists` は既存設定の上書きを防ぐための表示です。
+範囲を変更する場合は `--select-mask .camera-runtime\masks\232-v2.json` など新しい名前で作成し、以降の `--mask-config` も同じ名前に変更します。
+**カメラの向きや解像度が変わった場合も、範囲を設定し直してください。**
+
+## 2. 通常運用：マスク付きでDB保存する
+
+教室232の場所IDが **1の場合**のコマンドです。教室名232と場所IDは別です。
+PCや接続先DBが変わったときは、先に場所IDを確認してください。
 
 ```powershell
 .\.venv\Scripts\python.exe manage.py shell -c "from crowd_app.models import LocationMaster; print(list(LocationMaster.objects.values('location_id', 'name', 'capacity')))"
 ```
 
-以下は場所223の `location_id` が **1の場合**です。違う場合は `--location-id 1` の数字を置き換えてください。
+人数検知・マスク付きプレビュー・DB保存を起動：
 
 ```powershell
-.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --save-db --location-id 1
-```
-
-最初の正常な推論を保存し、その後は保存完了から300秒（5分）後以降に次の計測・保存を行います。
-`DB saved` が保存成功の目印です。保存先は既存の `.env` とプロセスの環境変数に従います。
-
-映像ウィンドウを表示せず、人数検知と保存を行う場合：
-
-```powershell
-.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --save-db --location-id 1 --headless
-```
-
-短い間隔で2件だけ保存して終了する場合（実DBに追加されます）：
-
-```powershell
-.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --save-db --location-id 1 --interval 5 --max-records 2 --headless
-```
-
-## 4. マスクの除外領域を作成する（DB保存なし）
-
-新しい設定ファイルを作成します。既存ファイルを上書きせず、必要に応じて名前を変更してください。
-
-```powershell
-.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --select-mask .camera-runtime\masks\223-v1.json
-```
-
-矩形選択・保存操作の詳細は [camera-masking.md](camera-masking.md) を参照してください。
-
-## 5. 保存済みマスクを使って人数検知する（DB保存なし）
-
-指定したマスク設定ファイルが存在することを確認してください。
-
-```powershell
-.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --mask-config .camera-runtime\masks\223-v1.json
-```
-
-## 6. マスク前後を1フレーム比較して保存する（DB保存なし）
-
-```powershell
-.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --mask-config .camera-runtime\masks\223-v1.json --compare-mask --headless --max-frames 1 --max-images 1
-```
-
-比較画像などをローカルへ保存して自動終了します。保存先は実行ログで確認できます。
-`--compare-mask` と `--save-db` は併用できません。
-
-## 7. マスクを使ってDB保存する
-
-```powershell
-<<<<<<< HEAD
 .\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --mask-config .camera-runtime\masks\232-v1.json --save-db --location-id 1
-=======
-.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --mask-config .camera-runtime\masks\223-v1.json --save-db --location-id 1
->>>>>>> 5c8f5deb4ccd6d42a6eaffec732bfdc0787eb746
 ```
 
-場所IDとマスク設定ファイルは事前に確認してください。
+- 起動後、最初の正常な推論結果を保存します。以降は保存完了から300秒（5分）後以降に再計測・保存します。
+- `DB saved: ... people=9 ...` などが出れば保存成功です。正常に検知した0人も保存します。
+- `Waiting for next measurement` は次の計測待ちです。表示の人数は前回の結果で、待機中は検知枠・人数を更新しません。映像にはマスクを適用します。
+- 保存先は既存の `.env` とプロセスの環境変数に従います。このコマンドは混雑記録を追加し、混雑予測は生成しません。
+
+映像ウィンドウなしで運用する場合は、同じコマンドの末尾に `--headless` を付けます。
+
+## 3. 検知確認用：DB保存なしで連続検知する
+
+人数が正しく検知されるか、マスクが人を隠していないかを確認するときだけ使います。
+通常運用と同じマスクを使いますが、`--save-db` を付けないためDBへ記録しません。
+
+```powershell
+.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --mask-config .camera-runtime\masks\232-v1.json
+```
+
+こちらは5分待機せず、各フレームで人数検知します。確認後は停止し、「2」のDB保存コマンドへ戻してください。
+
+## 4. 接続確認用：映像取得だけを試す
+
+マスク・人数検知・DB保存を使わず、カメラへ接続できるかを確認します。
+
+```powershell
+.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --capture-only
+```
+
+`Frame acquired: 1280x720` などが表示されれば取得成功です。
+
+## 5. マスク前後を同じフレームで比較する
+
+マスクによる検知への影響を調べるためのコマンドです。比較画像などをローカルへ保存して終了し、DBには保存しません。
+
+```powershell
+.\.venv\Scripts\python.exe tools\camera_preview.py --source "http://192.168.0.151:8080/?action=stream" --timeout 30 --mask-config .camera-runtime\masks\232-v1.json --compare-mask --headless --max-frames 1 --max-images 1
+```
+
+保存先は実行ログで確認できます。`--compare-mask` / `--select-mask` と `--save-db` は併用できません。
 
 ## 停止方法
 
-実行中のPowerShellで **Ctrl+C** を押します。映像ウィンドウがある場合は **Q / Esc** でも停止できます。
-停止しても保存済みのDBデータは削除されません。
+実行中のPowerShellで **Ctrl+C** を押します。映像ウィンドウでは **Q / Esc**、またはウィンドウを閉じても停止します。
+停止しても保存済みDBデータは削除されません。
 
-## よくあるログ
+## エラー・ログの見方
 
-| 表示 | 意味・確認すること |
+| 表示 | 意味・対処 |
 | --- | --- |
-| `DB writes disabled` | DB保存なし。保存する場合は `--save-db --location-id ...` を指定 |
-| `Frame acquired` | 映像取得成功 |
-| `Exclusion rectangles=0` | 適用する除外領域が0個。マスク使用時は設定内容を確認 |
+| `Mask file not found` | 指定した設定がありません。「1」で作成・保存し、パスを確認 |
+| `Mask file already exists` | 作成済みです。通常起動には `--select-mask` ではなく `--mask-config` を使用 |
+| `Mask configuration cancelled` | 設定は保存されていません。確認画面でSを押して保存 |
+| `Input open failed` / `Stream timeout` | 配信の起動、IP・ポート、ネットワーク、映像URLを確認 |
+| `Exclusion rectangles=0` | 除外領域が0個。必要ならマスク範囲を再設定 |
+| `DB writes disabled` | DB保存なしの確認モード |
 | `DB saved` | DB保存成功 |
-| `Input open failed` / `Stream timeout` | カメラの起動、IP・ポート、ネットワーク、映像URLを確認 |
 | `Model is missing` | `.camera-runtime\models\yolo11n.pt` を確認 |
 
-配信URLは映像ストリームを直接返すURLを指定します。閲覧用HTMLページでは取得できません。
-人数検知にはカメラ用の依存関係とモデルが必要です。
+接続待ち時間は `--timeout 30` で30秒に指定しています。映像URLにはHTMLの閲覧ページではなく、ストリームを直接返すURLを指定します。
+DB保存時のログは `.camera-runtime\logs\recording-*.log` に出力されます。
 
 ## 詳細手順
 

@@ -74,6 +74,37 @@ class MaskTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     load_mask(path, (10, 20, 3))
 
+    @patch('cv2.VideoCapture')
+    def test_db_waiting_preview_keeps_mask_without_extra_measurement(self, factory):
+        frame = np.full((100, 160, 3), 123, dtype=np.uint8)
+        mask = {'width': 160, 'height': 100, 'rectangles': [[5, 50, 20, 30]]}
+        factory.return_value.isOpened.return_value = True
+        factory.return_value.read.return_value = (True, frame)
+        model = MagicMock()
+        model.names = {0: 'person'}
+        result = MagicMock()
+        result.boxes = []
+        result.plot.return_value = apply_mask(frame, mask)
+        model.predict.return_value = [result]
+        displayed = []
+        args = previous_tests.CameraPreviewTests().args(
+            capture_only=False, save_db=True, location_id=1, headless=False, max_frames=2)
+        with patch('ultralytics.YOLO', return_value=model), \
+             patch('tools.db_recording.CrowdRecorder') as writer, \
+             patch('tools.camera_preview.load_mask', return_value=mask), \
+             patch('tools.camera_preview.time.monotonic', return_value=0), \
+             patch('cv2.namedWindow'), patch('cv2.resizeWindow'), \
+             patch('cv2.imshow', side_effect=lambda name, image: displayed.append(image.copy())), \
+             patch('cv2.waitKey', return_value=-1), \
+             patch('cv2.getWindowProperty', return_value=1), patch('cv2.destroyAllWindows'):
+            self.assertEqual(run(args), 0)
+            writer.return_value.save.assert_called_once()
+        model.predict.assert_called_once()
+        self.assertEqual(len(displayed), 2)
+        self.assertTrue(np.all(displayed[1][50:80, 5:25] == 0))
+        self.assertTrue(np.all(displayed[1][50:80, 30:40] == 123))
+        self.assertTrue(np.all(frame == 123))
+
     def test_compare_rejects_db_before_writer_or_camera(self):
         args = previous_tests.CameraPreviewTests().args(compare_mask=True, save_db=True, location_id=1)
         with patch('tools.db_recording.CrowdRecorder') as writer, patch('cv2.VideoCapture') as capture:
