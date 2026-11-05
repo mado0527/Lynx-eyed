@@ -1,5 +1,5 @@
 {% load static %}
-<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ title }} | Lynx-eyed</title><link rel="stylesheet" href="{% static 'crowd_app/home.css' %}"></head><body><main class="container">
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ title }} | Lynx-eyed</title><link rel="stylesheet" href="{% static 'crowd_app/home.css' %}">{% include 'crowd_app/communication_assets.html' %}</head><body><main class="container">
 <header class="header"><div class="page-heading"><a class="icon-button back-link" href="{% if page == 'weekly' %}{% url 'prediction' %}{% else %}{% url 'home' %}{% endif %}" aria-label="戻る">←</a><div><h1>{{ title }}</h1><p class="muted">{{ subtitle }}</p></div></div>{% if page != 'help' %}<span class="unimplemented-badge">未実装</span>{% endif %}</header>
 {% if page == 'help' %}
 <div class="guide-grid">

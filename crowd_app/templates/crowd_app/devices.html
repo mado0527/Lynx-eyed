@@ -1,5 +1,5 @@
 {% load static tz %}
-<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>端末情報管理 | Lynx-eyed</title><link rel="stylesheet" href="{% static 'crowd_app/management.css' %}?v=20261008-2"></head><body><main class="management-page device-page">
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>端末情報管理 | Lynx-eyed</title><link rel="stylesheet" href="{% static 'crowd_app/management.css' %}?v=20261008-2">{% include 'crowd_app/communication_assets.html' %}</head><body><main class="management-page device-page">
 <header class="device-header"><a class="back-button" href="{% if can_access_dashboard %}{% url 'management' %}{% if selected_location %}?location={{ selected_location.pk }}{% endif %}{% else %}{% url 'admin:index' %}{% endif %}" aria-label="管理者ページに戻る">←</a><div><h1>端末情報管理</h1><p>システム詳細</p></div><span aria-hidden="true"></span></header>
 <p class="card-note">自動監視は未実装です。以下は登録済みの情報で、現在の稼働状態を保証するものではありません。{% if selected_location %}カメラの対象場所：{{ selected_location.name }}。端末には場所の項目がないため全端末を表示します。{% endif %}</p>
 <div class="device-three-grid">

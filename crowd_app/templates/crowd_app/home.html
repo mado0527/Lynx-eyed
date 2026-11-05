@@ -7,7 +7,7 @@
   {% if refresh_seconds %}<meta http-equiv="refresh" content="{{ refresh_seconds }}">{% endif %}
   <title>Lynx-eyed | 現在の混雑状況</title>
   <link rel="stylesheet" href="{% static 'crowd_app/home.css' %}?v=20261029-menu">
-</head>
+{% include 'crowd_app/communication_assets.html' %}</head>
 <body>
   <main class="container">
     <header class="header">

@@ -1,5 +1,5 @@
 {% load static l10n %}
-<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>混雑予測グラフ | Lynx-eyed</title><link rel="stylesheet" href="{% static 'crowd_app/weekly.css' %}?v=20261008-2"><link rel="stylesheet" href="{% static 'crowd_app/prediction.css' %}?v=20261008-2"></head>
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>混雑予測グラフ | Lynx-eyed</title><link rel="stylesheet" href="{% static 'crowd_app/weekly.css' %}?v=20261008-2"><link rel="stylesheet" href="{% static 'crowd_app/prediction.css' %}?v=20261008-2">{% include 'crowd_app/communication_assets.html' %}</head>
 <body><main class="weekly-page prediction-page">
 <header><a class="back" href="{% url 'home' %}{% if selected_location %}?location={{ selected_location.pk }}{% endif %}" aria-label="トップへ戻る"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7"/></svg></a><div><h1>混雑予測グラフ</h1><p>本日の予測データ</p></div><span class="header-spacer" aria-hidden="true"></span></header>
 {% if invalid_location %}<p class="notice">指定された場所が見つかりません。登録済みの場所を表示しています。</p>{% endif %}

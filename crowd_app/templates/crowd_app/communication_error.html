@@ -1,0 +1,4 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ error_message }} | Lynx-eyed</title><link rel="stylesheet" href="{% static 'crowd_app/home.css' %}">{% include 'crowd_app/communication_assets.html' %}</head>
+<body><main class="container"><section class="card" role="alert"><h1>{{ error_message }}</h1><p>通信状態を確認して、もう一度お試しください。</p></section></main></body></html>

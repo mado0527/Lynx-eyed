@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>曜日ごとのグラフ | Lynx-eyed</title><link rel="stylesheet" href="{% static 'crowd_app/weekly.css' %}?v=20261008-2"></head>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>曜日ごとのグラフ | Lynx-eyed</title><link rel="stylesheet" href="{% static 'crowd_app/weekly.css' %}?v=20261008-2">{% include 'crowd_app/communication_assets.html' %}</head>
 <body><main class="weekly-page">
 <header><a class="back" href="{% url 'prediction' %}{% if selected_location %}?location={{ selected_location.pk }}{% endif %}" aria-label="混雑予測グラフへ戻る"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7"/></svg></a><div><h1>曜日ごとのグラフ</h1><p>{% if saved_summary %}保存済み曜日別集計・{{ summary_month|date:"Y年m月" }}{% else %}週間平均データ{% endif %}</p></div><span class="header-spacer" aria-hidden="true"></span></header>
 <section class="graph-card" aria-labelledby="graph-title">

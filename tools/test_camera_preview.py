@@ -7,6 +7,8 @@ import numpy as np
 
 from tools.camera_preview import run, ChangeSnapshots
 from tempfile import TemporaryDirectory
+from crowd_app.communication import COMMUNICATION_ERROR_MESSAGE
+from django.db.utils import OperationalError
 
 
 class CameraPreviewTests(unittest.TestCase):
@@ -25,6 +27,7 @@ class CameraPreviewTests(unittest.TestCase):
         with self.assertLogs(level='ERROR') as logs:
             self.assertEqual(run(self.args()), 1)
         self.assertIn('nothing saved', logs.output[0])
+        self.assertIn(COMMUNICATION_ERROR_MESSAGE, logs.output[0])
         capture.read.assert_not_called()
         capture.release.assert_called_once()
 
@@ -33,10 +36,56 @@ class CameraPreviewTests(unittest.TestCase):
         capture = factory.return_value
         capture.isOpened.return_value = True
         capture.read.return_value = (False, None)
-        with patch('ultralytics.YOLO') as model, self.assertLogs(level='ERROR'):
+        with patch('ultralytics.YOLO') as model, self.assertLogs(level='ERROR') as logs:
             self.assertEqual(run(self.args(capture_only=False)), 1)
         model.assert_not_called()
+        self.assertTrue(any(COMMUNICATION_ERROR_MESSAGE in line for line in logs.output))
         capture.release.assert_called_once()
+
+    def test_database_connection_failure_is_reported_before_camera_start(self):
+        with patch('tools.db_recording.CrowdRecorder', side_effect=OperationalError(2003, 'private credentials')), \
+             patch('cv2.VideoCapture') as capture, self.assertLogs(level='ERROR') as logs:
+            self.assertEqual(run(self.args(save_db=True, location_id=1)), 1)
+        capture.assert_not_called()
+        self.assertTrue(any(COMMUNICATION_ERROR_MESSAGE in line for line in logs.output))
+        self.assertFalse(any('private credentials' in line for line in logs.output))
+
+    @patch('cv2.VideoCapture')
+    def test_stream_disconnect_does_not_save_zero_after_success(self, factory):
+        frame = np.zeros((100, 160, 3), dtype=np.uint8)
+        factory.return_value.isOpened.return_value = True
+        factory.return_value.read.side_effect = [(True, frame), (False, None)]
+        model = MagicMock()
+        model.names = {0: 'person'}
+        result = MagicMock()
+        result.boxes = [object()]
+        result.plot.return_value = frame.copy()
+        model.predict.return_value = [result]
+        with patch('ultralytics.YOLO', return_value=model), \
+             patch('tools.db_recording.CrowdRecorder') as writer, self.assertLogs(level='ERROR') as logs:
+            self.assertEqual(run(self.args(capture_only=False, save_db=True, location_id=1, max_frames=3)), 1)
+            writer.return_value.save.assert_called_once()
+            self.assertEqual(writer.return_value.save.call_args.args[0], 1)
+        self.assertTrue(any(COMMUNICATION_ERROR_MESSAGE in line for line in logs.output))
+        factory.return_value.release.assert_called_once()
+
+    @patch('cv2.VideoCapture')
+    def test_db_disconnect_during_save_is_reported_without_retry(self, factory):
+        frame = np.zeros((100, 160, 3), dtype=np.uint8)
+        factory.return_value.isOpened.return_value = True
+        factory.return_value.read.return_value = (True, frame)
+        model = MagicMock()
+        model.names = {0: 'person'}
+        result = MagicMock()
+        result.boxes = [object()]
+        model.predict.return_value = [result]
+        with patch('ultralytics.YOLO', return_value=model), \
+             patch('tools.db_recording.CrowdRecorder') as writer, self.assertLogs(level='ERROR') as logs:
+            writer.return_value.save.side_effect = OperationalError(2013, 'connection lost')
+            self.assertEqual(run(self.args(capture_only=False, save_db=True, location_id=1)), 1)
+            writer.return_value.save.assert_called_once()
+        self.assertTrue(any(COMMUNICATION_ERROR_MESSAGE in line for line in logs.output))
+        factory.return_value.release.assert_called_once()
 
     @patch('cv2.VideoCapture')
     def test_inference_only_requests_person_and_does_not_save(self, factory):

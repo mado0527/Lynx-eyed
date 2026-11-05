@@ -15,6 +15,7 @@ CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault('YOLO_CONFIG_DIR', str(CONFIG_DIR))
 sys.path.insert(0, str(ROOT))
 from tools.camera_masking import load_mask, apply_mask, select_mask, comparison_image, ComparisonEvidence
+from crowd_app.communication import COMMUNICATION_ERROR_MESSAGE, is_communication_error
 
 
 def parse_args():
@@ -124,6 +125,17 @@ class ChangeSnapshots:
 
 
 def run(args):
+    try:
+        return _run(args)
+    except Exception as exc:
+        if not is_communication_error(exc):
+            raise
+        logging.error('%s (communication failed: %s). No zero-count fallback; stopping.',
+                      COMMUNICATION_ERROR_MESSAGE, type(exc).__name__)
+        return 1
+
+
+def _run(args):
     import cv2
     compare = getattr(args, 'compare_mask', False)
     selection = getattr(args, 'select_mask', None)
@@ -151,11 +163,11 @@ def run(args):
     window = f'Lynx-eyed | Person preview | {status} | Q / Esc to stop'
     try:
         if not capture.isOpened():
-            logging.error('Input open failed. No count produced; nothing saved.')
+            logging.error('%s: Input open failed. No count produced; nothing saved.', COMMUNICATION_ERROR_MESSAGE)
             return 1
         ok, frame = capture.read()
         if not ok or frame is None or not frame.size:
-            logging.error('First frame acquisition failed. Nothing saved.')
+            logging.error('%s: First frame acquisition failed. Nothing saved.', COMMUNICATION_ERROR_MESSAGE)
             return 1
         logging.info('Frame acquired: %dx%d', frame.shape[1], frame.shape[0])
         if selection:
@@ -247,7 +259,7 @@ def run(args):
                 break
             ok, frame = capture.read()
             if not ok or frame is None or not frame.size:
-                logging.error('Frame read failed; not treated as zero persons. Stopping without saving.')
+                logging.error('%s: Frame read failed; not treated as zero persons. Stopping without saving.', COMMUNICATION_ERROR_MESSAGE)
                 return 1
             measured_at = datetime.now(timezone.utc)
         logging.info('Preview finished: %d frames; DB records=%d; snapshot images=%d', frames, records, snapshots.saved if snapshots else 0)
