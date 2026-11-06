@@ -7,14 +7,12 @@
 <div class="chart"><div class="scale" aria-hidden="true">{% for tick in y_ticks %}<span>{{ tick }}</span>{% endfor %}</div><div class="plot">
 <div class="grid" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
 {% localize off %}{% for tick in ticks %}<div class="time-grid" style="left:{{ tick.left }}%" aria-hidden="true"></div>{% endfor %}
-<svg class="forecast-lines" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true"><path class="actual-line" d="{{ actual_path }}"/><path class="forecast-line" d="{{ forecast_path }}"/></svg>
-{% for point in actual_points %}<span class="chart-dot actual-dot {{ point.edge }}" style="left:{{ point.left }}%;top:{{ point.top }}%" tabindex="0" aria-label="実績 {{ point.at|date:'H:i:s' }} {{ point.count }}人"><span class="tooltip"><span class="tooltip-heading">{{ point.at|date:'H:i' }}</span><span class="tooltip-value">実績：{{ point.count }}人</span></span></span>{% endfor %}
-{% for point in forecast_points %}<span class="chart-dot forecast-dot {{ point.edge }}" style="left:{{ point.left }}%;top:{{ point.top }}%" tabindex="0" aria-label="予測対象 {{ point.at|date:'H:i:s' }} {{ point.count }}人、作成日時は未記録"><span class="tooltip"><span class="tooltip-heading">{{ point.at|date:'H:i' }}</span><span class="tooltip-value">予測：{{ point.count }}人</span><small>作成日時：未記録</small></span></span>{% endfor %}
+<svg class="forecast-lines" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true"><path class="forecast-line" d="{{ forecast_path }}"/></svg>
+{% for point in forecast_points %}<span class="chart-dot forecast-dot {{ point.edge }}" style="left:{{ point.left }}%;top:{{ point.top }}%" tabindex="0" aria-label="予測対象 {{ point.at|date:'H:i:s' }} {{ point.count }}人、過去の同曜日・同時間帯の平均"><span class="tooltip"><span class="tooltip-heading">{{ point.at|date:'H:i' }}</span><span class="tooltip-value">予測：{{ point.count }}人</span><small>過去の観測 {{ point.record.sample_count }}件の平均</small></span></span>{% endfor %}
 {% for tick in ticks %}<span class="time-label {% if not tick.compact %}wide-label{% endif %}" style="left:{{ tick.left }}%">{{ tick.label }}</span>{% endfor %}{% endlocalize %}
 {% if not predictions %}<p class="no-forecast" role="status">予測データがありません</p>{% endif %}
 </div></div>
-{% if invalid_predictions %}<p class="notice">人数が負の予測データ{{ invalid_predictions }}件は表示対象から除外しています。</p>{% endif %}
 </section>
-<aside class="info-card"><h2 class="badge">予測のポイント</h2><ul>{% if peak %}<li>保存済み予測の最大値は{{ peak.predicted_at|date:'H:i' }}の{{ peak.expected_count }}人です。</li><li>本日の未来の予測{{ predictions|length }}件を表示しています。</li><li>予測の生成方法・精度は未確認です。</li>{% else %}<li>予測データがありません。</li><li>予測値を生成する処理は未実装です。</li><li>実測記録を予測値として表示することはありません。</li>{% endif %}</ul></aside>
+<aside class="info-card"><h2 class="badge">予測のポイント</h2><ul>{% if peak %}<li>平均による予測の最大値は{{ peak.predicted_at|date:'H:i' }}の{{ peak.expected_count }}人です。</li><li>本日の未来の予測{{ predictions|length }}件を表示しています。</li><li>同じ場所・曜日・時間帯の過去の観測人数の平均です。精度は未評価です。</li>{% else %}<li>予測データがありません。</li><li>同じ曜日・時間帯の過去の観測データがある場合に平均値を表示します。</li><li>観測データのない時間帯は補完しません。</li>{% endif %}</ul></aside>
 <a class="home-button" href="{% url 'weekly' %}{% if selected_location %}?location={{ selected_location.pk }}{% endif %}">曜日ごとのグラフを表示</a>
 </main><script src="{% static 'crowd_app/graph_tooltips.js' %}?v=20261008-2" defer></script></body></html>

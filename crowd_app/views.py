@@ -4,8 +4,9 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import PermissionDenied
 from .calculations import calculate_crowd_rate
 
-from .models import CrowdLog, CrowdPrediction, LocationMaster, DeviceInfo, CameraInfo, DayOfWeekSummaryLog
+from .models import CrowdLog, LocationMaster, DeviceInfo, CameraInfo, DayOfWeekSummaryLog
 from .prediction_chart import chart_series
+from .average_forecast import hourly_averages
 from datetime import datetime, time, timedelta
 from django.utils import timezone
 from django.db.models import Avg, Count
@@ -21,31 +22,14 @@ def prediction_graph(request):
     selected = selected or (locations[0] if locations else None)
     now = timezone.now()
     today = timezone.localdate(now)
-    zone = timezone.get_current_timezone()
-    start = timezone.make_aware(datetime.combine(today, time.min), zone)
-    end = timezone.make_aware(datetime.combine(today + timedelta(days=1), time.min), zone)
-    predictions, actuals = [], []
-    invalid_predictions = 0
-    if selected:
-        queryset = CrowdPrediction.objects.filter(location=selected, predicted_at__gt=now, predicted_at__lt=end)
-        invalid_predictions = queryset.filter(expected_count__lt=0).count()
-        # IDs resolve duplicates deterministically, without claiming a creation date.
-        by_target = {}
-        for row in queryset.filter(expected_count__gte=0).order_by('predicted_at', 'prediction_id'):
-            by_target[row.predicted_at] = row
-        predictions = list(by_target.values())
-        by_time = {}
-        for row in CrowdLog.objects.filter(location=selected, recorded_at__gte=start, recorded_at__lte=now).order_by('recorded_at', 'log_id'):
-            by_time[row.recorded_at] = row
-        actuals = list(by_time.values())
-    times = [timezone.localtime(row.predicted_at) for row in predictions] + [timezone.localtime(row.recorded_at) for row in actuals]
+    predictions = hourly_averages(selected, now) if selected else []
+    times = [timezone.localtime(row.predicted_at) for row in predictions]
     start_hour = min([9] + [at.hour for at in times])
     end_hour = max([18] + [math.ceil(at.hour + at.minute / 60 + at.second / 3600 + at.microsecond / 3_600_000_000) for at in times])
-    max_count = max([40] + [row.expected_count for row in predictions] + [row.user_count for row in actuals])
+    max_count = max([40] + [row.expected_count for row in predictions])
     step = max(10, math.ceil(max_count / 4 / 10) * 10)
     ceiling = step * 4
     forecast_points, forecast_path = chart_series(predictions, 'predicted_at', 'expected_count', start_hour, end_hour, ceiling)
-    actual_points, actual_path = chart_series(actuals, 'recorded_at', 'user_count', start_hour, end_hour, ceiling)
     label_stride = math.ceil((end_hour - start_hour) / 4)
     ticks = [{'left': (hour - start_hour) / (end_hour - start_hour) * 100,
               'label': f'{hour}:00', 'compact': hour in (start_hour, end_hour) or
@@ -55,9 +39,9 @@ def prediction_graph(request):
     return render(request, 'crowd_app/prediction.html', {
         'selected_location': selected, 'invalid_location': invalid_location,
         'today': today, 'now': now, 'forecast_points': forecast_points, 'forecast_path': forecast_path,
-        'actual_points': actual_points, 'actual_path': actual_path, 'ticks': ticks,
+        'ticks': ticks,
         'y_ticks': [step * index for index in range(4, -1, -1)], 'peak': peak,
-        'predictions': predictions, 'actuals': actuals, 'invalid_predictions': invalid_predictions,
+        'predictions': predictions,
     })
 
 
