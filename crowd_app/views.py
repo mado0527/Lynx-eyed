@@ -9,8 +9,6 @@ from .prediction_chart import chart_series
 from .average_forecast import hourly_averages
 from datetime import datetime, time, timedelta
 from django.utils import timezone
-from django.db.models import Avg, Count
-from django.db.models.functions import ExtractIsoWeekDay
 import math
 
 
@@ -79,9 +77,15 @@ def weekly_graph(request):
         saved_summary = bool(aggregates)
         if not saved_summary:
             rows = (CrowdLog.objects.filter(location=selected, recorded_at__gte=start, recorded_at__lt=end)
-                    .annotate(weekday=ExtractIsoWeekDay('recorded_at', tzinfo=zone))
-                    .values('weekday').annotate(average=Avg('user_count'), samples=Count('pk')))
-            aggregates = {row['weekday']: row for row in rows}
+                    .order_by().values_list('recorded_at', 'user_count'))
+            # Convert in Python: MySQL CONVERT_TZ can return NULL without timezone tables.
+            totals = {}
+            for recorded_at, user_count in rows.iterator():
+                weekday = timezone.localtime(recorded_at, zone).isoweekday()
+                total, samples = totals.get(weekday, (0, 0))
+                totals[weekday] = (total + user_count, samples + 1)
+            aggregates = {weekday: {'average': total / samples, 'samples': samples}
+                          for weekday, (total, samples) in totals.items()}
     maximum = max((row['average'] for row in aggregates.values()), default=0)
     step = max(1, math.ceil(maximum / 4))
     ceiling = step * 4

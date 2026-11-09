@@ -393,6 +393,27 @@ class WeeklyGraphTests(TestCase):
         self.location.delete()
         self.assertIsNone(self.client.get(reverse('weekly')).context['selected_location'])
 
+    def test_local_weekday_average_across_utc_boundaries_and_multiple_weeks(self):
+        # Three Monday records in Japan include two UTC Sunday timestamps.
+        for at, count in (
+            (datetime(2026, 11, 1, 15, tzinfo=datetime_timezone.utc), 0),
+            (datetime(2026, 11, 2, 14, 59, tzinfo=datetime_timezone.utc), 10),
+            (datetime(2026, 11, 8, 15, tzinfo=datetime_timezone.utc), 20),
+            (datetime(2026, 11, 2, 15, tzinfo=datetime_timezone.utc), 30),
+        ):
+            CrowdLog.objects.create(location=self.location, user_count=count, recorded_at=at)
+        before = list(CrowdLog.objects.order_by('pk').values())
+        now = datetime(2026, 11, 10, 4, tzinfo=datetime_timezone.utc)
+        with patch('crowd_app.views.timezone.now', return_value=now):
+            response = self.client.get(reverse('weekly'), {'location': self.location.pk})
+        chart = response.context['chart']
+        self.assertEqual((chart[0]['average'], chart[0]['samples']), (10, 3))
+        self.assertEqual((chart[1]['average'], chart[1]['samples']), (30, 1))
+        self.assertTrue(all(row['average'] is None for row in chart[2:]))
+        self.assertEqual(response.context['samples'], 4)
+        self.assertContains(response, 'class="bar ', count=2)
+        self.assertEqual(list(CrowdLog.objects.order_by('pk').values()), before)
+
 
 class PredictionGraphTests(TestCase):
     def setUp(self):
