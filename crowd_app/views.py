@@ -119,9 +119,14 @@ def home(request):
     ticks = []
     max_count = 1
     if selected:
-        history = list(CrowdLog.objects.filter(location=selected).order_by('-recorded_at', '-log_id')[:20])
-        latest = history[0] if history else None
-        history.reverse()
+        logs = CrowdLog.objects.filter(location=selected)
+        latest = logs.order_by('-recorded_at', '-log_id').first()
+        today = timezone.localdate()
+        zone = timezone.get_current_timezone()
+        start = timezone.make_aware(datetime.combine(today, time.min), zone)
+        end = timezone.make_aware(datetime.combine(today + timedelta(days=1), time.min), zone)
+        history = list(logs.filter(recorded_at__gte=start, recorded_at__lt=end)
+                       .order_by('recorded_at', 'log_id'))
         if latest is not None:
             occupancy = calculate_crowd_rate(latest.user_count, selected.capacity)
         if history:

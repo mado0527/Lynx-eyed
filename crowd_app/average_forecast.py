@@ -1,9 +1,8 @@
 """Read-only hourly forecasts from historical observations."""
 from datetime import datetime, time
 from types import SimpleNamespace
+from collections import defaultdict
 
-from django.db.models import Avg, Count
-from django.db.models.functions import ExtractHour, ExtractIsoWeekDay
 from django.utils import timezone
 
 from .models import CrowdLog
@@ -14,14 +13,18 @@ def hourly_averages(location, now):
     today = timezone.localdate(now)
     start = timezone.make_aware(datetime.combine(today, time.min), zone)
     rows = (CrowdLog.objects.filter(location=location, recorded_at__lt=start, user_count__gte=0)
-            .annotate(weekday=ExtractIsoWeekDay('recorded_at', tzinfo=zone),
-                      hour=ExtractHour('recorded_at', tzinfo=zone))
-            .filter(weekday=today.isoweekday()).order_by().values('hour')
-            .annotate(mean=Avg('user_count'), samples=Count('pk')).order_by('hour'))
+            .order_by().values_list('recorded_at', 'user_count'))
+    # Convert in Python: MySQL's CONVERT_TZ returns NULL without timezone tables.
+    buckets = defaultdict(lambda: [0, 0])
+    for recorded_at, user_count in rows.iterator():
+        local = timezone.localtime(recorded_at, zone)
+        if local.isoweekday() == today.isoweekday():
+            buckets[local.hour][0] += user_count
+            buckets[local.hour][1] += 1
     forecasts = []
-    for row in rows:
-        target = timezone.make_aware(datetime.combine(today, time(row['hour'])), zone)
+    for hour, (total, samples) in sorted(buckets.items()):
+        target = timezone.make_aware(datetime.combine(today, time(hour)), zone)
         if target > now:
             forecasts.append(SimpleNamespace(predicted_at=target,
-                expected_count=round(row['mean'], 1), sample_count=row['samples']))
+                expected_count=round(total / samples, 1), sample_count=samples))
     return forecasts

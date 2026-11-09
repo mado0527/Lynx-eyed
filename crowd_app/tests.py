@@ -154,11 +154,11 @@ class HomeTests(TestCase):
         location = self.make_location()
         other = self.make_location(name='別の場所')
         self.record(other, 99)
-        at = datetime(2026, 10, 2, 1, 2, 3, tzinfo=datetime_timezone.utc)
+        at = timezone.make_aware(datetime.combine(timezone.localdate(), datetime.min.time())) + timedelta(hours=10)
         newer = self.record(location, 10, at)
         response = self.client.get('/')
         self.assertContains(response, 'class="trend-bar"', count=1)
-        older = self.record(location, 3, at.replace(day=1))
+        older = self.record(location, 3, at - timedelta(hours=1))
         response = self.client.get('/')
         self.assertEqual(response.context['history'], [older, newer])
         self.assertContains(response, 'class="trend-bar"', count=2)
@@ -166,15 +166,46 @@ class HomeTests(TestCase):
         self.assertContains(response, 'type="submit"', count=1)
         self.assertEqual(response.context['chart_points'][-1]['record'], newer)
 
-    def test_graph_missing_and_recent_limit(self):
+    def test_graph_missing_and_all_today_records(self):
         location = self.make_location()
-        self.assertContains(self.client.get('/'), '対象期間のデータが存在しません')
+        self.assertContains(self.client.get('/'), '本日のデータが存在しません')
         for count in range(21):
             self.record(location, count)
         response = self.client.get('/')
-        self.assertEqual(len(response.context['history']), 20)
-        self.assertEqual(response.context['history'][0].user_count, 1)
+        self.assertEqual(len(response.context['history']), 21)
+        self.assertEqual(response.context['history'][0].user_count, 0)
         self.assertEqual(response.context['latest'].user_count, 20)
+
+    def test_graph_filters_by_japan_day_boundaries_without_changing_records(self):
+        location = self.make_location()
+        other = self.make_location(name='別の場所')
+        now = datetime(2026, 11, 6, 4, tzinfo=datetime_timezone.utc)
+        start = datetime(2026, 11, 5, 15, tzinfo=datetime_timezone.utc)
+        end = start + timedelta(days=1)
+        self.record(location, 1, start - timedelta(microseconds=1))
+        first = self.record(location, 2, start)
+        second = self.record(location, 3, start)
+        last = self.record(location, 4, end - timedelta(microseconds=1))
+        self.record(location, 5, end)
+        self.record(other, 6, start)
+        before = list(CrowdLog.objects.order_by('pk').values())
+        with patch('crowd_app.views.timezone.now', return_value=now):
+            response = self.client.get('/', {'location': location.pk})
+        self.assertEqual(response.context['history'], [first, second, last])
+        self.assertContains(response, 'class="trend-bar"', count=3)
+        self.assertContains(response, '本日3件')
+        self.assertEqual(list(CrowdLog.objects.order_by('pk').values()), before)
+
+    def test_yesterday_records_do_not_fill_today_graph(self):
+        location = self.make_location()
+        now = datetime(2026, 11, 6, 4, tzinfo=datetime_timezone.utc)
+        yesterday = self.record(location, 8, now - timedelta(days=1))
+        with patch('crowd_app.views.timezone.now', return_value=now):
+            response = self.client.get('/')
+        self.assertEqual(response.context['history'], [])
+        self.assertContains(response, '本日のデータが存在しません')
+        self.assertNotContains(response, 'class="trend-bar"')
+        self.assertEqual(response.context['latest'], yesterday)
 
 
 class AutomaticCrowdRateTests(TestCase):
@@ -242,7 +273,9 @@ class MockupScreenTests(TestCase):
         for name in ('prediction', 'weekly', 'live', 'help'):
             response = self.client.get(reverse(name))
             self.assertEqual(response.status_code, 200)
-            if name != 'weekly':
+            if name == 'prediction':
+                self.assertContains(response, '予測データがありません')
+            elif name != 'weekly':
                 self.assertContains(response, '未実装')
             self.assertContains(response, 'name="viewport"')
         self.assertContains(self.client.get(reverse('prediction')), reverse('weekly'))
