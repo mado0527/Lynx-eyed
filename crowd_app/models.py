@@ -96,7 +96,14 @@ class CameraInfo(models.Model):
 
 # 5. 混雑状況記録テーブル (crowd_log)
 class CrowdLog(models.Model):
+    SOURCE_CHOICES = (
+        ('unknown', '未確認'),
+        ('camera', 'カメラ実測'),
+        ('dummy', 'ダミー'),
+    )
     log_id = models.AutoField(primary_key=True, verbose_name="記録ID")
+    source = models.CharField(max_length=16, choices=SOURCE_CHOICES, default='unknown', editable=False,
+                              db_index=True, verbose_name='記録元')
     location = models.ForeignKey(
         LocationMaster, on_delete=models.CASCADE, db_column='location_id', verbose_name="場所ID"
     )

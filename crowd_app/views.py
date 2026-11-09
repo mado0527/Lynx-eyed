@@ -42,6 +42,10 @@ def prediction_graph(request):
         'ticks': ticks,
         'y_ticks': [step * index for index in range(4, -1, -1)], 'peak': peak,
         'predictions': predictions,
+        'refresh_seconds': 5,
+        'camera_sample_count': predictions[0].camera_sample_count if predictions else 0,
+        'last_camera_at': predictions[0].last_camera_at if predictions else None,
+        'baseline_unverified': any(p.contains_dummy or p.contains_unknown for p in predictions),
     })
 
 
@@ -120,7 +124,7 @@ def home(request):
     max_count = 1
     if selected:
         logs = CrowdLog.objects.filter(location=selected)
-        latest = logs.order_by('-recorded_at', '-log_id').first()
+        latest = logs.filter(recorded_at__lte=timezone.now()).order_by('-recorded_at', '-log_id').first()
         today = timezone.localdate()
         zone = timezone.get_current_timezone()
         start = timezone.make_aware(datetime.combine(today, time.min), zone)

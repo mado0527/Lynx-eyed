@@ -168,7 +168,7 @@ class HomeTests(TestCase):
 
     def test_graph_missing_and_all_today_records(self):
         location = self.make_location()
-        self.assertContains(self.client.get('/'), '本日のデータが存在しません')
+        self.assertContains(self.client.get('/'), '対象期間のデータが存在しません')
         for count in range(21):
             self.record(location, count)
         response = self.client.get('/')
@@ -203,9 +203,18 @@ class HomeTests(TestCase):
         with patch('crowd_app.views.timezone.now', return_value=now):
             response = self.client.get('/')
         self.assertEqual(response.context['history'], [])
-        self.assertContains(response, '本日のデータが存在しません')
+        self.assertContains(response, '対象期間のデータが存在しません')
         self.assertNotContains(response, 'class="trend-bar"')
         self.assertEqual(response.context['latest'], yesterday)
+
+    def test_future_review_dummy_is_not_current_occupancy(self):
+        location = self.make_location()
+        latest = self.record(location, 3)
+        CrowdLog.objects.create(location=location, user_count=14, source='dummy',
+                                recorded_at=timezone.now() + timedelta(days=1))
+        response = self.client.get('/')
+        self.assertEqual(response.context['latest'], latest)
+        self.assertEqual(response.context['occupancy'], Decimal('7.5'))
 
 
 class AutomaticCrowdRateTests(TestCase):
@@ -379,6 +388,7 @@ class WeeklyGraphTests(TestCase):
     def test_no_locations_and_no_measurements(self):
         response = self.client.get(reverse('weekly'))
         self.assertEqual(response.context['samples'], 0)
+        self.assertContains(response, '対象期間のデータが存在しません')
         self.assertTrue(all(row['average'] is None for row in response.context['chart']))
         self.location.delete()
         self.assertIsNone(self.client.get(reverse('weekly')).context['selected_location'])
@@ -397,6 +407,93 @@ class PredictionGraphTests(TestCase):
         at = (self.now - timedelta(days=days)).replace(hour=hour - 9)
         return CrowdLog.objects.create(location=location or self.location,
                                        user_count=count, recorded_at=at)
+
+    def camera(self, count, minutes=5, source='camera', location=None):
+        return CrowdLog.objects.create(location=location or self.location, source=source,
+            user_count=count, recorded_at=self.now - timedelta(minutes=minutes))
+
+    def test_new_camera_readings_change_forecast_without_writes_on_view(self):
+        self.observe(10, hour=11)
+        self.observe(20, hour=13)
+        baseline = self.client.get(reverse('prediction'))
+        self.camera(5)
+        first = self.client.get(reverse('prediction'))
+        self.assertEqual(first.context['predictions'][0].expected_count, 15)
+        self.assertEqual(first.context['camera_sample_count'], 1)
+        self.assertNotEqual(first.context['forecast_path'], baseline.context['forecast_path'])
+        self.camera(15, minutes=1)
+        before = list(CrowdLog.objects.values())
+        second = self.client.get(reverse('prediction'))
+        self.assertEqual(second.context['predictions'][0].expected_count, 20)
+        self.assertEqual(second.context['camera_sample_count'], 2)
+        self.assertContains(second, 'カメラ実測2件で補正')
+        self.assertContains(second, 'http-equiv="refresh" content="5"')
+        self.assertEqual(list(CrowdLog.objects.values()), before)
+
+    def test_adjustment_excludes_dummy_unknown_stale_future_and_other_location(self):
+        self.observe(10, hour=11)
+        self.observe(20, hour=13)
+        self.camera(40, source='dummy')
+        self.camera(39, source='unknown')
+        self.camera(40, minutes=31)
+        self.camera(40, minutes=-1)
+        self.camera(40, location=self.other)
+        valid = self.camera(6)
+        response = self.client.get(reverse('prediction'))
+        self.assertEqual(response.context['predictions'][0].expected_count, 16)
+        self.assertEqual(response.context['camera_sample_count'], 1)
+        self.assertEqual(response.context['last_camera_at'], valid.recorded_at)
+
+    def test_zero_camera_count_is_used_and_zero_baseline_does_not_divide(self):
+        self.observe(10, hour=11)
+        self.observe(20, hour=13)
+        reading = self.camera(0)
+        self.assertEqual(self.client.get(reverse('prediction')).context['predictions'][0].expected_count, 10)
+        # Metadata is explicit: a measured zero is not a communication failure.
+        self.assertEqual(self.client.get(reverse('prediction')).context['camera_sample_count'], 1)
+        CrowdLog.objects.filter(pk=reading.pk).update(user_count=4)
+        CrowdLog.objects.filter(location=self.location, recorded_at__lt=self.now - timedelta(days=1),
+                                user_count=10).update(user_count=0)
+        self.assertEqual(self.client.get(reverse('prediction')).context['predictions'][0].expected_count, 22)
+
+    def test_no_matching_baseline_does_not_invent_forecast_hours(self):
+        self.camera(12)
+        response = self.client.get(reverse('prediction'))
+        self.assertEqual(response.context['predictions'], [])
+
+    def test_live_adjustment_uses_japan_midnight_boundary(self):
+        self.now = datetime(2026, 11, 5, 15, 30, tzinfo=datetime_timezone.utc)
+        CrowdLog.objects.create(location=self.location, user_count=10,
+            recorded_at=datetime(2026, 10, 29, 15, 10, tzinfo=datetime_timezone.utc))
+        CrowdLog.objects.create(location=self.location, user_count=20,
+            recorded_at=datetime(2026, 10, 29, 16, tzinfo=datetime_timezone.utc))
+        self.camera(40, minutes=40)  # Previous day in Japan.
+        self.camera(5, minutes=10)
+        with patch('crowd_app.views.timezone.now', return_value=self.now):
+            response = self.client.get(reverse('prediction'))
+        self.assertEqual(response.context['predictions'][0].expected_count, 15)
+        self.assertEqual(response.context['camera_sample_count'], 1)
+
+    def test_review_morning_dummy_and_noon_camera_update_the_prediction(self):
+        self.now = datetime(2026, 11, 10, 4, 20, tzinfo=datetime_timezone.utc)
+        for hour, count in [(12, 10), (13, 20), (14, 30)]:
+            row = self.observe(count, days=14, hour=hour)
+            CrowdLog.objects.filter(pk=row.pk).update(source='dummy')
+        for hour, count in [(8, 2), (9, 6), (10, 10), (11, 14)]:
+            at = timezone.make_aware(datetime(2026, 11, 10, hour))
+            CrowdLog.objects.create(location=self.location, user_count=count,
+                                    recorded_at=at, source='dummy')
+        with patch('crowd_app.views.timezone.now', return_value=self.now):
+            initial = self.client.get(reverse('prediction'))
+            self.camera(5, minutes=25)  # 12:55, compared with historical 12:00 bucket.
+            first = self.client.get(reverse('prediction'))
+            self.camera(15, minutes=5)  # 13:15, compared with historical 13:00 bucket.
+            second = self.client.get(reverse('prediction'))
+        self.assertEqual(initial.context['predictions'][0].expected_count, 30)
+        self.assertEqual(first.context['predictions'][0].expected_count, 22.5)
+        self.assertEqual(second.context['predictions'][0].expected_count, 25)
+        self.assertEqual(second.context['camera_sample_count'], 2)
+        self.assertContains(second, 'ダミーまたは記録元が未確認')
 
     def test_average_uses_matching_location_weekday_hour_and_past_days(self):
         self.observe(0)
@@ -424,7 +521,7 @@ class PredictionGraphTests(TestCase):
         response = self.client.get(reverse('prediction'))
         self.assertEqual(response.context['predictions'], [])
         self.assertEqual(response.context['forecast_path'], '')
-        self.assertContains(response, '予測データがありません')
+        self.assertContains(response, '対象期間のデータが存在しません')
 
     def test_zero_is_valid_and_request_does_not_write_records(self):
         self.observe(0)
@@ -464,9 +561,19 @@ class CameraRecordingIntegrationTests(TestCase):
         record.refresh_from_db()
         self.assertEqual(record.crowd_rate, 40)
         self.assertEqual(record.recorded_at, measured_at)
+        self.assertEqual(record.source, 'camera')
         response = self.client.get('/', {'location': location.pk})
         self.assertEqual(response.context['latest'], record)
         self.assertEqual(response.context['occupancy'], Decimal('40.0'))
+        measured_text = timezone.localtime(measured_at).strftime('%Y/%m/%d %H:%M:%S')
+        self.assertContains(response, measured_text)
+        self.assertContains(response, f'href="/prediction-graph/?location={location.pk}"')
+        with patch('crowd_app.views.timezone.now', return_value=measured_at + timedelta(minutes=5)):
+            refreshed = self.client.get('/', {'location': location.pk})
+        self.assertContains(refreshed, measured_text)
+        self.assertEqual(CrowdLog.objects.count(), 1)
+        record.refresh_from_db()
+        self.assertEqual(record.recorded_at, measured_at)
         zero = recorder.save(0, timezone.now())
         self.assertEqual(zero.crowd_rate, 0)
         self.assertEqual(self.client.get('/', {'location': location.pk}).context['latest'], zero)

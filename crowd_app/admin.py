@@ -30,7 +30,7 @@ class CrowdLogAdminForm(forms.ModelForm):
 @admin.register(CrowdLog)
 class CrowdLogAdmin(admin.ModelAdmin):
     form = CrowdLogAdminForm
-    readonly_fields = ('calculated_rate',)
+    readonly_fields = ('calculated_rate', 'source')
 
     @admin.display(description="保存時の混雑率")
     def calculated_rate(self, obj):

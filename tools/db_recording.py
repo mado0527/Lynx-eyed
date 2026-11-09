@@ -22,4 +22,5 @@ class CrowdRecorder:
         # create() invokes the existing model save() and shared rate calculation.
         return CrowdLog.objects.create(
             location_id=self.location.pk, user_count=count, recorded_at=measured_at,
+            source='camera',
         )
