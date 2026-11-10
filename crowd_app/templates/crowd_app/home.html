@@ -36,7 +36,7 @@
       <section class="card detail-card" aria-labelledby="trend-heading">
         <h2 id="trend-heading"><span class="clock-icon" aria-hidden="true">↗</span>利用人数の推移</h2>
         {% if history %}
-        <p class="chart-caption">本日{{ history|length }}件の計測記録・日本時間</p>
+        <p class="chart-caption">本日・直近{{ history|length }}件の計測記録・日本時間</p>
         <div class="trend-tooltip-plot"><svg class="trend-chart" viewBox="0 0 680 300" role="group" aria-labelledby="chart-title chart-description">
           <title id="chart-title">利用人数の推移</title><desc id="chart-description">横軸は計測日時、縦軸は利用人数です。各棒の詳細は下の計測記録一覧で確認できます。</desc>
           <text x="12" y="24" class="axis-label">利用人数（人）</text>
@@ -52,7 +52,7 @@
           <text x="340" y="294" text-anchor="middle" class="axis-label">計測日時（日本時間）</text>
         </svg></div>
         <details class="record-details"><summary>計測記録一覧</summary><div class="table-scroll"><table><thead><tr><th scope="col">計測日時（日本時間）</th><th scope="col">利用人数</th></tr></thead><tbody>{% for record in history %}<tr><td>{% timezone "Asia/Tokyo" %}{{ record.recorded_at|date:'Y/m/d H:i:s' }}{% endtimezone %}</td><td>{{ record.user_count }}人</td></tr>{% endfor %}</tbody></table></div></details>
-        {% else %}<p class="no-measurement">対象期間のデータが存在しません</p><p class="chart-caption">表示対象：選択した場所の当日分の計測記録（日本時間）</p>{% endif %}
+        {% else %}<p class="no-measurement">対象期間のデータが存在しません</p><p class="chart-caption">表示対象：選択した場所の当日分・直近5件（日本時間）</p>{% endif %}
       </section>
     </div>
     <aside class="help prediction-panel"><div class="help-icon" aria-hidden="true">↗</div><div><h3>混雑予測</h3><p>予測画面では過去の同曜日・時間帯の平均をもとに、直近のカメラ実測で補正した予測を確認できます。上のグラフは本日の計測記録です。</p></div></aside>

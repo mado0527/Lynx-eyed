@@ -150,7 +150,8 @@ class HomeTests(TestCase):
     def test_existing_admin_route(self):
         self.assertRedirects(self.client.get('/admin/'), '/admin/login/?next=/admin/')
 
-    def test_graph_order_selection_and_single_record(self):
+    @patch('crowd_app.views.timezone.now', return_value=datetime(2026, 11, 10, 3, tzinfo=datetime_timezone.utc))
+    def test_graph_order_selection_and_single_record(self, clock):
         location = self.make_location()
         other = self.make_location(name='別の場所')
         self.record(other, 99)
@@ -166,15 +167,32 @@ class HomeTests(TestCase):
         self.assertContains(response, 'type="submit"', count=1)
         self.assertEqual(response.context['chart_points'][-1]['record'], newer)
 
-    def test_graph_missing_and_all_today_records(self):
+    def test_graph_missing_and_latest_five_today_records(self):
         location = self.make_location()
         self.assertContains(self.client.get('/'), '対象期間のデータが存在しません')
         for count in range(21):
             self.record(location, count)
         response = self.client.get('/')
-        self.assertEqual(len(response.context['history']), 21)
-        self.assertEqual(response.context['history'][0].user_count, 0)
+        self.assertEqual([row.user_count for row in response.context['history']], [16, 17, 18, 19, 20])
+        self.assertContains(response, 'class="trend-bar"', count=5)
         self.assertEqual(response.context['latest'].user_count, 20)
+        self.assertEqual(CrowdLog.objects.count(), 21)
+
+    def test_latest_five_uses_measurement_time_and_id_and_excludes_future(self):
+        location = self.make_location()
+        other = self.make_location(name='別の場所')
+        now = datetime(2026, 11, 10, 4, tzinfo=datetime_timezone.utc)
+        at = now - timedelta(minutes=5)
+        tied = [self.record(location, count, at) for count in range(6)]
+        self.record(location, 99, now - timedelta(hours=1))
+        self.record(location, 88, now + timedelta(minutes=5))
+        self.record(other, 77, now - timedelta(minutes=1))
+        before = list(CrowdLog.objects.order_by('pk').values())
+        with patch('crowd_app.views.timezone.now', return_value=now):
+            response = self.client.get('/', {'location': location.pk})
+        self.assertEqual(response.context['history'], tied[1:])
+        self.assertEqual(response.context['latest'], tied[-1])
+        self.assertEqual(list(CrowdLog.objects.order_by('pk').values()), before)
 
     def test_graph_filters_by_japan_day_boundaries_without_changing_records(self):
         location = self.make_location()
@@ -191,9 +209,12 @@ class HomeTests(TestCase):
         before = list(CrowdLog.objects.order_by('pk').values())
         with patch('crowd_app.views.timezone.now', return_value=now):
             response = self.client.get('/', {'location': location.pk})
-        self.assertEqual(response.context['history'], [first, second, last])
-        self.assertContains(response, 'class="trend-bar"', count=3)
-        self.assertContains(response, '本日3件')
+        self.assertEqual(response.context['history'], [first, second])
+        self.assertContains(response, 'class="trend-bar"', count=2)
+        self.assertContains(response, '本日・直近2件')
+        with patch('crowd_app.views.timezone.now', return_value=end - timedelta(microseconds=1)):
+            midnight_response = self.client.get('/', {'location': location.pk})
+        self.assertEqual(midnight_response.context['history'], [first, second, last])
         self.assertEqual(list(CrowdLog.objects.order_by('pk').values()), before)
 
     def test_yesterday_records_do_not_fill_today_graph(self):
