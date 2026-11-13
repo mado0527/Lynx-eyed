@@ -4,17 +4,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  {% if refresh_seconds %}<meta http-equiv="refresh" content="{{ refresh_seconds }}">{% endif %}
+
   <title>Lynx-eyed | 現在の混雑状況</title>
-  <link rel="stylesheet" href="{% static 'crowd_app/home.css' %}?v=20261029-menu">
-{% include 'crowd_app/communication_assets.html' %}</head>
-<body>
-  <main class="container">
-    <header class="header">
-      <div class="brand"><h1 class="brand-heading"><img class="brand-logo" src="{% static 'crowd_app/lynx-eyed-logo.png' %}" alt="Lynx-eyed" width="320" height="86"></h1></div>
-      <div class="header-refresh"><div class="last-measured">最終計測日時<br>{% if latest %}{% timezone "Asia/Tokyo" %}<time datetime="{{ latest.recorded_at|date:'c' }}">{{ latest.recorded_at|date:'Y/m/d H:i:s' }}</time>（日本時間）{% endtimezone %}{% else %}未計測{% endif %}</div><button type="submit" form="location-form" class="icon-button" aria-label="更新" title="最新記録に更新"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg></button><span class="unimplemented-badge">自動検知：検証中</span></div>
-    </header>
-    {% if invalid_location %}<p class="notice" role="status">指定された場所が見つかりません。登録済みの場所を表示しています。</p>{% endif %}
+  <link rel="stylesheet" href="{% static 'crowd_app/home.css' %}?v=20261110-header-time">
+<link rel="stylesheet" href="{% static 'crowd_app/user-ui.css' %}?v=20261113-balanced-logo">{% include 'crowd_app/communication_assets.html' %}</head>
+<body class="public-page">
+  <main class="container" data-live-page="home" data-live-interval="{% if refresh_seconds %}{{ refresh_seconds }}{% else %}5{% endif %}">
+    {% include 'crowd_app/user_header.html' with is_main_menu=True title_text="現在の混雑状況" %}
+    <div data-live-fragment="location-notice">{% if invalid_location %}<p class="notice" role="status">指定された場所が見つかりません。登録済みの場所を表示しています。</p>{% endif %}</div>
     <section class="location-card" aria-label="場所の選択と更新">
       {% if not selected_location %}<div><h2>場所が未登録です</h2></div>{% endif %}
       <form id="location-form" action="{% url 'home' %}" method="get" class="controls">
@@ -23,17 +20,21 @@
       </form>
     </section>
     <div class="status-grid">
-      <section class="card occupancy-card" aria-labelledby="occupancy-heading">
+      <section data-live-fragment="home-occupancy" class="card occupancy-card crowd-state-{{ crowd_state }}" aria-labelledby="occupancy-heading">
         <h2 id="occupancy-heading" class="badge"><span class="dot" aria-hidden="true"></span>現在の混雑度</h2>
+        {% if selected_location %}<p class="occupancy-location">場所：{{ selected_location.name }}</p>{% endif %}
+        <p class="crowd-state" role="status">{{ crowd_label }}</p>
         {% if latest %}
-          {% if occupancy != None %}<p class="percentage">{{ occupancy|floatformat:-1 }}<span>%</span></p>{% else %}<p class="empty-value">算出不可</p>{% endif %}
+          {% if is_previous_day %}<p class="measurement-warning">本日の記録がないため、前回の人数を表示しています。</p>{% endif %}
+          {% if occupancy != None %}<p class="percentage"><span class="percentage-caption">混雑率</span>{{ occupancy|floatformat:-1 }}<span>%</span></p>{% else %}<p class="muted">混雑率：算出不可</p>{% endif %}
           <p class="people">利用人数 <strong>{{ latest.user_count }}人</strong><span>／定員 {{ selected_location.capacity }}人</span></p>
           {% if selected_location.capacity <= 0 %}<p class="muted">定員が0以下のため、混雑率を算出できません。</p>{% endif %}
+          {% if latest.source == 'dummy' %}<p class="measurement-note">表示中の人数はテストデータです。</p>{% else %}<p class="measurement-note">計測時点の人数です。実際の状況と異なる場合があります。</p>{% endif %}
         {% else %}
-          <p class="empty-value">未計測</p><p class="muted">{% if selected_location %}この場所の混雑記録はまだありません。{% else %}場所を登録すると混雑状況を確認できます。{% endif %}</p>
+          <p class="muted">{% if selected_location %}この場所の計測データはまだありません。{% else %}場所を登録すると混雑状況を確認できます。{% endif %}</p>
         {% endif %}
       </section>
-      <section class="card detail-card" aria-labelledby="trend-heading">
+      <section data-live-fragment="home-trend" class="card detail-card" aria-labelledby="trend-heading">
         <h2 id="trend-heading"><span class="clock-icon" aria-hidden="true">↗</span>利用人数の推移</h2>
         {% if history %}
         <p class="chart-caption">本日・直近{{ history|length }}件の計測記録・日本時間</p>
@@ -63,7 +64,7 @@
       <a href="{% url 'management' %}{% if selected_location %}?location={{ selected_location.pk }}{% endif %}" class="action admin-action"><span aria-hidden="true">⚙</span>管理者ページ</a>
     </nav>
   </main>
-<script src="{% static 'crowd_app/graph_tooltips.js' %}?v=20261008-2" defer></script>
+<script src="{% static 'crowd_app/page-live.js' %}?v=20261113-1" defer></script><script src="{% static 'crowd_app/graph_tooltips.js' %}?v=20261113-live" defer></script>
 <script src="{% static 'crowd_app/screen_menu.js' %}?v=20261029-1" defer></script>
 </body>
 </html>

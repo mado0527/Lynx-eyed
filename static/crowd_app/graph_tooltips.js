@@ -1,5 +1,12 @@
 // Display existing chart values only. No predictions or aggregates are generated here.
-document.querySelectorAll('.plot, .trend-tooltip-plot').forEach((plot, index) => {
+(() => {
+const plots = new Map();
+let nextId = 0;
+function initialize() {
+for (const plot of plots.keys()) if (!plot.isConnected) plots.delete(plot);
+document.querySelectorAll('.plot, .trend-tooltip-plot').forEach((plot) => {
+  if (plots.has(plot)) return;
+  const index = nextId++;
   // A stale or missing stylesheet must not render tooltip text as normal page content.
   if (getComputedStyle(plot).getPropertyValue('--graph-tooltip-styled').trim() !== '1') return;
   const columns = [...plot.querySelectorAll('.column')];
@@ -81,10 +88,15 @@ document.querySelectorAll('.plot, .trend-tooltip-plot').forEach((plot, index) =>
   plot.addEventListener('focusout', event => {
     if (!plot.contains(event.relatedTarget)) hide();
   });
-  document.addEventListener('pointerdown', event => {
-    if (!plot.contains(event.target)) hide();
-  });
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') hide();
-  });
+  plots.set(plot, { hide });
 });
+}
+document.addEventListener('pointerdown', event => {
+  for (const [plot, state] of plots) if (!plot.contains(event.target)) state.hide();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') for (const state of plots.values()) state.hide();
+});
+document.addEventListener('lynx:content-updated', initialize);
+initialize();
+})();

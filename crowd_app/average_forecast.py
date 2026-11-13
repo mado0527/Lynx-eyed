@@ -8,7 +8,7 @@ from django.utils import timezone
 from .models import CrowdLog
 
 
-def hourly_averages(location, now):
+def hourly_averages(location, now, *, include_past=False):
     zone = timezone.get_current_timezone()
     today = timezone.localdate(now)
     start = timezone.make_aware(datetime.combine(today, time.min), zone)
@@ -50,11 +50,16 @@ def hourly_averages(location, now):
     forecasts = []
     for hour, (total, samples, dummy_samples, unknown_samples) in sorted(buckets.items()):
         target = timezone.make_aware(datetime.combine(today, time(hour)), zone)
-        if target > now:
+        is_past = target <= now
+        if include_past or not is_past:
+            # Past slots are a historical comparison baseline, not a forecast
+            # issued before observation. Never apply today's later readings to them.
+            applied_factor, applied_offset = (1, 0) if is_past else (factor, offset)
             forecasts.append(SimpleNamespace(predicted_at=target,
-                expected_count=round(max(0, total / samples * factor + offset), 1),
+                expected_count=round(max(0, total / samples * applied_factor + applied_offset), 1),
                 sample_count=samples, baseline_count=round(total / samples, 1),
-                camera_sample_count=camera_samples, last_camera_at=last_camera_at,
-                camera_mean=round(actual_total / camera_samples, 1) if camera_samples else None,
+                camera_sample_count=0 if is_past else camera_samples,
+                last_camera_at=None if is_past else last_camera_at, is_past=is_past,
+                camera_mean=round(actual_total / camera_samples, 1) if camera_samples and not is_past else None,
                 contains_dummy=bool(dummy_samples), contains_unknown=bool(unknown_samples)))
     return forecasts

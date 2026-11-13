@@ -1,0 +1,35 @@
+/* Loaded by public screens only. Main-menu branding is deliberately separate. */
+a,button,select,summary{transition:background-color 180ms ease,box-shadow 180ms ease,border-color 180ms ease}
+a:hover,button:hover,a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible{box-shadow:0 0 0 3px #3b82f61a}
+a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible{outline:2px solid #60a5fa;outline-offset:3px}
+.public-header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;min-width:0;margin:0 0 8px;padding:0}
+.public-header>.public-title-row{display:flex;align-items:center;gap:10px;min-width:0;flex:none;text-align:left}
+.public-header .public-back{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;border:1px solid #e2e8f0;border-radius:8px;background:white;color:#64748b;text-decoration:none;box-shadow:0 1px 2px #0000000d}
+.public-header .public-back svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.public-header .public-heading{flex:1;min-width:0;text-align:left}
+.public-header h1{font-size:20px;line-height:1.45;font-weight:600;margin:0;white-space:normal;overflow-wrap:anywhere}
+.public-header .public-heading p{font-size:12px;line-height:1.6;color:#64748b;margin:3px 0 0;overflow-wrap:anywhere;white-space:normal}
+.public-header>.user-brand-row{display:flex;align-items:center;justify-content:flex-end;min-width:0;flex:none;text-align:right;margin:0}
+.public-header .user-brand-link{display:inline-flex;align-items:center;min-height:44px;max-width:100%;padding:4px 0;border-radius:7px;text-decoration:none}
+.public-header .user-brand-link img{display:block;width:100px;max-width:100%;height:auto;object-fit:contain}
+.public-header .user-brand-link:hover,.public-header .user-brand-link:focus-visible{background:#eaf1fb}
+.public-header .unimplemented-badge{margin-top:5px}
+/* Restore the pre-shared-header main menu: 320px desktop, 260px mobile. */
+.main-menu-header{display:flex;align-items:center;justify-content:space-between;gap:20px;min-width:0;margin:0 0 16px}
+.main-menu-header .brand{flex:1;min-width:0;max-width:100%}
+.main-menu-header .brand-heading{line-height:1}
+.main-menu-header .brand-logo{display:block;width:320px;max-width:100%;height:auto;aspect-ratio:auto;object-fit:contain}
+.main-menu-header .header-refresh{min-width:0;max-width:100%;flex-shrink:0;flex-wrap:wrap;gap:10px;margin:0;justify-content:flex-end}
+.main-menu-header .last-measured{min-width:0;overflow-wrap:anywhere;text-align:right}
+.main-menu-header .header-refresh .icon-button{flex-shrink:0}
+.public-page main{min-width:0;padding-inline:20px}
+.public-page main>*{min-width:0;max-width:100%}
+.public-page :is(.card,.graph-card,.info-card,.help,.guide-card,.placeholder-card,.result-card){min-width:0;overflow-wrap:anywhere}
+.public-page :is(.status-grid,.guide-grid,.actions,.help)>*{min-width:0}
+.public-page .help-icon{flex-shrink:0}
+.public-page .action .action-text{min-width:0;flex-shrink:1;overflow-wrap:anywhere}
+.public-page .placeholder-area{min-width:0;max-width:100%}
+@media(min-width:768px){.public-page main{padding-inline:32px}.public-header{gap:16px;margin-bottom:12px}.public-header h1{font-size:24px}.public-header .public-heading p{font-size:14px}.public-header .user-brand-link img{width:180px}}
+@media(max-width:800px){.main-menu-header{flex-wrap:wrap;gap:12px}.main-menu-header .brand{flex-basis:100%}.main-menu-header .brand-logo{width:260px}.main-menu-header .header-refresh{width:100%}}
+@media(prefers-reduced-motion:reduce){a,button,select,summary{transition:none!important}}
+.live-update-status{font-size:12px;line-height:1.6;color:#64748b;min-height:20px;margin:0 0 8px;overflow-wrap:anywhere}

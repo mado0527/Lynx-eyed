@@ -13,3 +13,17 @@
 .trend-tooltip-plot{--graph-tooltip-styled:1;position:relative;margin-top:12px}.trend-tooltip-plot .trend-chart{margin-top:0}.trend-slot{fill:transparent;pointer-events:all}.column.is-active .trend-slot{fill:#d1d5db}.trend-tooltip-plot .column{cursor:pointer}.trend-tooltip-plot .graph-tooltip{position:absolute;background:white;border:1px solid #e5e7eb;border-radius:7px;padding:10px 12px;box-shadow:0 2px 6px #0000000a;font-size:12px;line-height:1.6;color:#3b82f6;width:max-content;max-width:calc(100% - 8px);z-index:5;pointer-events:none}.trend-tooltip-plot .tooltip-heading,.trend-tooltip-plot .tooltip-value{display:block}.trend-tooltip-plot .tooltip-heading{font-size:11px;color:#6b7280}.trend-tooltip-plot [hidden]{display:none}.trend-tooltip-plot .column:focus-visible{outline:none}.trend-tooltip-plot .column:focus-visible .trend-slot{stroke:#93c5fd;stroke-width:2}
 .brand{min-width:0;max-width:100%}.brand-heading{line-height:1}.brand-logo{display:block;width:320px;max-width:100%;height:auto;aspect-ratio:320/86;object-fit:cover;object-position:center}@media(max-width:800px){.brand-logo{width:260px}}
 [data-screen-menu]>.action.is-selected{background:#3b82f6;border-color:#3b82f6;color:#fff}[data-screen-menu]>.action.is-selected:hover{background:#2563eb;border-color:#2563eb}
+
+/* The same status is conveyed by text and colour; percentage is the primary value. */
+.header .brand{flex:1}.header-refresh{flex-shrink:0}.header-refresh .icon-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:80px;padding:8px;font:inherit;font-size:13px;color:#374151}.header-refresh .icon-button svg{flex-shrink:0}
+.occupancy-card{--status-text:#475569;--status-tint:#f1f5f9;--status-border:#cbd5e1;border-color:var(--status-border)}
+.crowd-state-low{--status-text:#1d4ed8;--status-tint:#eff6ff;--status-border:#bfdbfe}
+.crowd-state-moderate{--status-text:#854d0e;--status-tint:#fef9c3;--status-border:#fde047}
+.crowd-state-high{--status-text:#b91c1c;--status-tint:#fef2f2;--status-border:#fecaca}
+.occupancy-card .badge{background:var(--status-tint);color:var(--status-text);margin-bottom:14px}.occupancy-card .dot{background:var(--status-text)}
+.occupancy-location{font-size:13px;color:#64748b;margin-bottom:8px}.crowd-state{font-size:clamp(21px,2.3vw,28px);font-weight:700;color:var(--status-text);line-height:1.5;overflow-wrap:anywhere}
+.occupancy-card .people{align-items:baseline;margin-top:8px;column-gap:6px}.occupancy-card .people strong{font-size:26px;font-weight:700;line-height:1.5;color:#1f2937}.occupancy-card .people>span{font-size:13px}
+.occupancy-card .percentage{display:flex;align-items:baseline;justify-content:center;gap:3px;margin-top:14px;font-size:clamp(40px,4.8vw,60px);line-height:1.3;color:var(--status-text);letter-spacing:0}.occupancy-card .percentage-caption{font-size:12px;margin-right:5px;font-weight:400;color:#64748b}
+.measurement-note{font-size:12px;color:#64748b;margin-top:14px}.measurement-warning{font-size:12px;color:#475569;background:#f1f5f9;border-radius:8px;padding:8px 10px;margin-top:12px}
+@media(max-width:800px){.header-refresh{width:auto;margin-left:auto;flex-wrap:nowrap}.header{flex-wrap:nowrap}.occupancy-card{padding:24px 18px}.occupancy-card .percentage{font-size:48px}.crowd-state{font-size:24px}}
+@media(max-width:800px){.header{flex-wrap:wrap}.header .brand{flex-basis:100%}.header-refresh{width:100%;justify-content:flex-end}.header-refresh .last-measured{text-align:right}}

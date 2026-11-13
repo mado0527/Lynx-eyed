@@ -27,7 +27,8 @@ def smooth_path(points):
     return path
 
 
-def chart_series(records, time_field, count_field, start_hour, end_hour, ceiling):
+def chart_series(records, time_field, count_field, start_hour, end_hour, ceiling,
+                 *, max_gap_seconds=None, smooth=True):
     points = []
     for row in records:
         at = timezone.localtime(getattr(row, time_field))
@@ -37,4 +38,18 @@ def chart_series(records, time_field, count_field, start_hour, end_hour, ceiling
         points.append({'record': row, 'at': at, 'count': getattr(row, count_field),
                        'left': left, 'top': top, 'x': left * 10, 'y': top * 10,
                        'edge': 'edge-left' if left < 20 else 'edge-right' if left > 80 else ''})
-    return points, smooth_path(points)
+    segments = []
+    segment = []
+    for point in points:
+        if segment and max_gap_seconds is not None and (point['at'] - segment[-1]['at']).total_seconds() > max_gap_seconds:
+            segments.append(segment)
+            segment = []
+        segment.append(point)
+    if segment:
+        segments.append(segment)
+    if smooth:
+        path = ' '.join(smooth_path(segment) for segment in segments)
+    else:
+        path = ' '.join(' '.join(f"{'M' if index == 0 else 'L'} {point['x']:.6f} {point['y']:.6f}"
+                                for index, point in enumerate(segment)) for segment in segments)
+    return points, path

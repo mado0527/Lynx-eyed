@@ -1,0 +1,2 @@
+{% load static %}
+<div class="user-brand-row"><a class="user-brand-link" href="{% url 'home' %}{% if selected_location %}?location={{ selected_location.pk }}{% elif request.GET.location %}?location={{ request.GET.location|urlencode }}{% endif %}" aria-label="Lynx-eyed メインメニューへ"><img src="{% static 'crowd_app/lynx-eyed-logo.png' %}" alt="Lynx-eyed" width="120" height="32"></a></div>

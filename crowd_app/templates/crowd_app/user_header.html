@@ -1,0 +1,17 @@
+{% load static tz %}
+{% if is_main_menu %}
+<header class="main-menu-header">
+<div class="brand"><h1 class="brand-heading"><img class="brand-logo" src="{% static 'crowd_app/lynx-eyed-logo.png' %}" alt="Lynx-eyed" width="320" height="86"></h1></div>
+<div class="header-refresh"><div class="last-measured" data-live-fragment="last-measured">最終集計日時<br>{% if latest %}{% timezone "Asia/Tokyo" %}<time datetime="{{ latest.recorded_at|date:'c' }}">{{ latest.recorded_at|date:'Y/m/d H:i:s' }}</time>（日本時間）{% endtimezone %}{% else %}未計測{% endif %}</div><button type="submit" form="location-form" class="icon-button" aria-label="更新" title="最新記録に更新"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg><span>更新</span></button></div>
+</header>
+{% else %}
+<header class="public-header">
+<div class="public-title-row">
+{% if back_url %}<a class="back public-back" href="{{ back_url }}{% if back_location and selected_location %}?location={{ selected_location.pk }}{% endif %}" aria-label="{{ back_label|default:'戻る' }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7"/></svg></a>{% endif %}
+<div class="public-heading"><h1>{{ title_text }}</h1>
+{% if header_kind == 'weekly' %}<p id="target-location">対象：{% if selected_location %}{{ selected_location.name }}{% else %}場所未登録{% endif %}</p>{% elif header_kind == 'prediction' %}<p>{% if is_preview %}表示日の予測と計測値{% else %}今日の予測と計測値{% endif %}</p>{% elif subtitle_text %}<p>{{ subtitle_text }}</p>{% endif %}
+{% if unimplemented %}<span class="unimplemented-badge">未実装</span>{% endif %}</div>
+</div>
+{% include 'crowd_app/user_brand.html' %}
+</header>
+{% endif %}
